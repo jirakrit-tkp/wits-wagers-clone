@@ -24,3 +24,31 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Sunburst rotation animation */
+@keyframes sunburst-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@layer utilities {
+  .sunburst-rotate { /* fallback util for animation */
+    animation: sunburst-rotate 12s linear infinite;
+    transform-origin: 50% 50%;
+  }
+
+  .font-oi {
+    font-family: 'Oi', serif;
+  }
+
+  .text-outline-waw {
+    /* inner black, middle light-blue, outer black */
+    text-shadow:
+      -6px 0 0 #000, 6px 0 0 #000, 0 -6px 0 #000, 0 6px 0 #000,
+      -6px -6px 0 #000, -6px 6px 0 #000, 6px -6px 0 #000, 6px 6px 0 #000,
+      -15px 0 0 #60a5fa, 15px 0 0 #60a5fa, 0 -15px 0 #60a5fa, 0 15px 0 #60a5fa,
+      -15px -15px 0 #60a5fa, -15px 15px 0 #60a5fa, 15px -15px 0 #60a5fa, 15px 15px 0 #60a5fa,
+      -24px 0 0 #000, 24px 0 0 #000, 0 -24px 0 #000, 0 24px 0 #000,
+      -24px -24px 0 #000, -24px 24px 0 #000, 24px -24px 0 #000, 24px 24px 0 #000;
+  }
+}
