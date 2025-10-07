@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/router";
 import io from "socket.io-client";
+import SiteFooter from "@/components/SiteFooter";
 
 export default function HomePage() {
   const router = useRouter();
@@ -42,7 +43,7 @@ export default function HomePage() {
   };
 
   return (
-    <main className="h-screen w-screen bg-yellow-200 relative overflow-hidden">
+    <main className="h-screen w-screen bg-yellow-200 relative overflow-hidden flex flex-col">
       {/* Radial base */}
       <div
         aria-hidden
@@ -58,7 +59,7 @@ export default function HomePage() {
         />
       </div>
 
-      <header className="relative z-10 h-full flex items-center justify-center">
+      <header className="relative z-10 flex-1 flex items-center justify-center">
         <section className="w-[50vw] h-[50vh] max-w-4xl mx-auto px-6 flex flex-col items-center justify-center text-center">
           <h1
             className="text-7xl md:text-8xl lg:text-9xl leading-tight tracking-tight text-white font-oi text-outline-waw"
@@ -68,7 +69,7 @@ export default function HomePage() {
           <div className="mt-6 w-full max-w-xl">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Host / Create Room */}
-              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl border border-yellow-300 p-4 flex flex-col items-center text-center">
+              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl p-4 flex flex-col items-center text-center">
                 <h2 className="text-lg font-bold text-blue-900">Host</h2>
                 {!createdRoomId && (
                   <button
@@ -130,6 +131,7 @@ export default function HomePage() {
           </div>
         </section>
       </header>
+      {/* Footer is now rendered globally via _app.js */}
     </main>
   );
 }
