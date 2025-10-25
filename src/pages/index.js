@@ -1,45 +1,31 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/router";
-import io from "socket.io-client";
 import SiteFooter from "@/components/SiteFooter";
 
 export default function HomePage() {
   const router = useRouter();
   const [createdRoomId, setCreatedRoomId] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
-  const socketRef = useRef(null);
-
-  useEffect(() => {
-    // Ensure the Socket.IO server is initialized on the Next.js side
-    fetch("/api/socketio").finally(() => {
-      const s = io({ path: "/socket.io", transports: ["websocket", "polling"] });
-      socketRef.current = s;
-    });
-
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.removeAllListeners();
-        socketRef.current.disconnect();
-      }
-    };
-  }, []);
+  const [hostId, setHostId] = useState("");
 
   const createRoom = () => {
     const id = Math.random().toString(36).substring(2, 6).toUpperCase();
+    const newHostId = `${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
     setCreatedRoomId(id);
-    socketRef.current?.emit("createRoom", id);
+    setHostId(newHostId);
+    // Room will be created when host enters the room page
   };
 
   const goToCreatedRoom = () => {
     if (!createdRoomId) return;
-    router.push(`/room/${createdRoomId}`);
+    router.push(`/room/${createdRoomId}/lobby?host=true&hostId=${hostId}`);
   };
 
   const joinRoom = () => {
     const trimmed = joinRoomId.trim().toUpperCase();
     if (!trimmed) return;
-    socketRef.current?.emit("joinRoom", { roomId: trimmed, player: { id: trimmed, name: "Player" } });
-    router.push(`/room/${trimmed}`);
+    // Don't emit joinRoom here - let the player enter their name in the lobby page first
+    router.push(`/room/${trimmed}/lobby`);
   };
 
   return (
