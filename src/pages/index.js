@@ -59,23 +59,23 @@ export default function HomePage() {
         />
       </div>
 
-      <header className="relative z-10 flex-1 flex items-center justify-center">
-        <section className="w-[50vw] h-[50vh] max-w-4xl mx-auto px-6 flex flex-col items-center justify-center text-center">
+      <header className="relative z-10 flex-1 flex items-center justify-center px-6">
+        <section className="w-full max-w-4xl flex flex-col items-center justify-center text-center">
           <h1
-            className="text-7xl md:text-8xl lg:text-9xl leading-tight tracking-tight text-white font-oi text-outline-waw"
+            className="text-5xl sm:text-7xl md:text-8xl lg:text-9xl leading-tight tracking-tight text-white font-oi text-outline-waw"
           >
             Wits &<br/>Wagers
           </h1>
-          <div className="mt-6 w-full max-w-xl">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="mt-6 w-full md:max-w-3xl mx-auto flex justify-center">
+            <div className="flex flex-col md:flex-row gap-4 max-sm:w-full">
               {/* Host / Create Room */}
-              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl p-4 flex flex-col items-center text-center">
+              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl p-4 flex flex-col items-center text-cente">
                 <h2 className="text-lg font-bold text-blue-900">Host</h2>
                 {!createdRoomId && (
                   <button
                     type="button"
                     onClick={createRoom}
-                    className="mt-3 w-full inline-flex items-center justify-center rounded-full bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 shadow-md transition"
+                    className="mt-3 w-full inline-flex items-center justify-center rounded-full bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 shadow-md transition whitespace-nowrap"
                   >
                     Create Room
                   </button>
@@ -89,7 +89,7 @@ export default function HomePage() {
                     <button
                       type="button"
                       onClick={goToCreatedRoom}
-                      className="mt-3 w-full inline-flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 shadow-md transition"
+                      className="mt-3 w-full inline-flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 shadow-md transition whitespace-nowrap"
                     >
                       Enter
                     </button>
@@ -110,18 +110,18 @@ export default function HomePage() {
                   <label htmlFor="room-code" className="sr-only">
                     Room Code
                   </label>
-                  <input
-                    id="room-code"
-                    type="text"
-                    inputMode="text"
-                    placeholder="Enter Code"
-                    value={joinRoomId}
-                    onChange={(e) => setJoinRoomId(e.target.value)}
-                    className="flex-1 rounded-full border border-blue-300 px-4 py-2.5 text-blue-900 placeholder-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
-                  />
+                <input
+                  id="room-code"
+                  type="text"
+                  inputMode="text"
+                  placeholder="Enter Code"
+                  value={joinRoomId}
+                  onChange={(e) => setJoinRoomId(e.target.value)}
+                  className="flex-1 min-w-0 rounded-full border border-blue-300 px-4 py-2.5 text-blue-900 placeholder-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
+                />
                   <button
                     type="submit"
-                    className="rounded-full bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 shadow-md transition"
+                    className="rounded-full bg-blue-700 hover:bg-blue-800 text-white font-semibold px-5 py-2.5 shadow-md transition whitespace-nowrap flex-shrink-0"
                   >
                     Join
                   </button>
