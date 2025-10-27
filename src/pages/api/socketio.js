@@ -3,6 +3,7 @@ import { Server } from "socket.io";
 import {
   createRoom,
   addPlayer,
+  removePlayer,
   submitAnswer,
   placeBet,
   revealAnswer,
@@ -10,14 +11,17 @@ import {
   startGame,
   nextRound,
   setPhase,
+  deleteRoom,
 } from "@/lib/gameState";
 
 export default function handler(req, res) {
   if (!res.socket.server.io) {
+    console.log("🚀 Initializing Socket.io server...");
     const io = new Server(res.socket.server);
     res.socket.server.io = io;
 
     io.on("connection", (socket) => {
+      console.log(`✅ New socket connected: ${socket.id}`);
       socket.on("createRoom", ({ roomId, hostId }) => {
         // Check if room already exists (e.g., when host refreshes)
         let room = getRoom(roomId);
@@ -188,7 +192,72 @@ export default function handler(req, res) {
           io.to(roomId).emit("roomUpdate", updatedRoom);
         }
       });
+
+      socket.on("deleteRoom", ({ roomId, hostId }) => {
+        console.log(`[Socket] deleteRoom event received: roomId=${roomId}, hostId=${hostId}`);
+        
+        const room = getRoom(roomId);
+        console.log(`[Socket] Room found:`, room ? `Yes (hostId=${room.hostId})` : 'No');
+        
+        if (!room) {
+          console.error(`[Socket] Room ${roomId} not found for deleteRoom`);
+          socket.emit("error", { message: "Room not found" });
+          return;
+        }
+
+        // Verify that the requester is the host
+        console.log(`[Socket] Checking host: room.hostId=${room.hostId}, provided hostId=${hostId}`);
+        if (room.hostId !== hostId) {
+          console.error(`[Socket] User ${hostId} is not the host of room ${roomId}`);
+          socket.emit("error", { message: "Only the host can delete the room" });
+          return;
+        }
+
+        console.log(`[Socket] ✅ Room ${roomId} is being deleted by host ${hostId}`);
+        
+        // Notify all clients in the room that it's being deleted
+        io.to(roomId).emit("roomDeleted", { roomId });
+        console.log(`[Socket] Emitted roomDeleted event to room ${roomId}`);
+        
+        // Delete the room from memory
+        const deleted = deleteRoom(roomId);
+        console.log(`[Socket] Room ${roomId} deletion result: ${deleted ? 'SUCCESS' : 'FAILED'}`);
+      });
+
+      socket.on("leaveRoom", ({ roomId, playerId }) => {
+        console.log(`[Socket] leaveRoom event received: roomId=${roomId}, playerId=${playerId}`);
+        
+        const room = getRoom(roomId);
+        if (!room) {
+          console.error(`[Socket] Room ${roomId} not found for leaveRoom`);
+          socket.emit("error", { message: "Room not found" });
+          return;
+        }
+
+        console.log(`[Socket] Player ${playerId} is leaving room ${roomId}`);
+        
+        // Remove player from the room
+        const removed = removePlayer(roomId, playerId);
+        console.log(`[Socket] Player removal result: ${removed ? 'SUCCESS' : 'FAILED'}`);
+        
+        if (removed) {
+          const updatedRoom = getRoom(roomId);
+          // Notify remaining players in the room
+          io.to(roomId).emit("playersUpdate", updatedRoom.players);
+          io.to(roomId).emit("roomUpdate", updatedRoom);
+          console.log(`[Socket] Updated players list sent to room ${roomId}. Remaining players: ${updatedRoom.players.length}`);
+        }
+        
+        // Confirm to the leaving player
+        socket.emit("leftRoom", { roomId });
+      });
+
+      socket.on("disconnect", () => {
+        console.log(`❌ Socket disconnected: ${socket.id}`);
+      });
     });
+  } else {
+    console.log("♻️  Socket.io server already initialized");
   }
 
   res.end();

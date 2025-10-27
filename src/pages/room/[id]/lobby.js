@@ -67,14 +67,15 @@ const LobbyPage = () => {
 
       // Socket event handlers
       s.on("connect", () => {
-        console.log("[Lobby] Socket connected:", s.id);
+        console.log("[Lobby] ✅ Socket connected:", s.id);
+        console.log("[Lobby] Socket.connected:", s.connected);
 
         // Auto-create/join for host
         if (savedIsHost && savedHostId) {
           console.log("[Lobby] Host reconnecting, creating room");
           setTimeout(() => {
             s.emit("createRoom", { roomId: id, hostId: savedHostId });
-            s.emit("joinRoom", { roomId: id, player: { id: savedHostId, isHost: true } });
+            s.emit("joinRoom", { roomId: id, isHost: true, hostId: savedHostId });
           }, 100);
         }
 
@@ -115,6 +116,42 @@ const LobbyPage = () => {
         console.log("[Lobby] Game started:", data);
         router.push(`/room/${id}`);
       });
+
+      s.on("roomDeleted", (data) => {
+        console.log("[Lobby] Room deleted:", data);
+        // Clear session storage
+        sessionStorage.removeItem(`room_${id}_isHost`);
+        sessionStorage.removeItem(`room_${id}_hostId`);
+        sessionStorage.removeItem(`room_${id}_playerId`);
+        sessionStorage.removeItem(`room_${id}_nickname`);
+        sessionStorage.removeItem(`room_${id}_color`);
+        sessionStorage.removeItem(`room_${id}_joined`);
+        // Redirect to home page
+        router.push("/");
+      });
+
+      s.on("leftRoom", (data) => {
+        console.log("[Lobby] Left room:", data);
+        // Clear session storage
+        sessionStorage.removeItem(`room_${id}_playerId`);
+        sessionStorage.removeItem(`room_${id}_nickname`);
+        sessionStorage.removeItem(`room_${id}_color`);
+        sessionStorage.removeItem(`room_${id}_joined`);
+        // Redirect to home page
+        router.push("/");
+      });
+
+      s.on("error", (error) => {
+        console.error("[Lobby] Socket error:", error);
+      });
+
+      s.on("disconnect", (reason) => {
+        console.log("[Lobby] Socket disconnected:", reason);
+      });
+
+      s.on("connect_error", (error) => {
+        console.error("[Lobby] Socket connection error:", error);
+      });
     });
 
     return () => {
@@ -145,7 +182,7 @@ const LobbyPage = () => {
 
       if (socketRef.current?.connected) {
         socketRef.current.emit("createRoom", { roomId: id, hostId: urlHostId });
-        socketRef.current.emit("joinRoom", { roomId: id, player: { id: urlHostId, isHost: true } });
+        socketRef.current.emit("joinRoom", { roomId: id, isHost: true, hostId: urlHostId });
       }
     }
   }, [router.isReady, router.query, id, joined]);
@@ -199,6 +236,48 @@ const LobbyPage = () => {
     if (!socketRef.current) return;
     console.log("[Lobby] Starting game");
     socketRef.current.emit("startGame", { roomId: id });
+  };
+
+  // Delete Room function for host
+  const handleDeleteRoom = () => {
+    console.log("[Lobby] handleDeleteRoom called");
+    console.log("[Lobby] socketRef.current:", socketRef.current);
+    console.log("[Lobby] isHost:", isHost);
+    console.log("[Lobby] hostId:", hostId);
+    
+    if (!socketRef.current || !isHost || !hostId) {
+      console.error("[Lobby] Cannot delete room - missing requirements");
+      return;
+    }
+    
+    const confirmDelete = window.confirm("คุณแน่ใจหรือไม่ที่จะลบห้องนี้? ผู้เล่นทุกคนจะถูกนำกลับไปหน้าแรก");
+    if (!confirmDelete) {
+      console.log("[Lobby] Delete cancelled by user");
+      return;
+    }
+
+    console.log("[Lobby] Emitting deleteRoom event with:", { roomId: id, hostId: hostId });
+    socketRef.current.emit("deleteRoom", { roomId: id, hostId: hostId });
+  };
+
+  // Leave Room function for players
+  const handleLeaveRoom = () => {
+    console.log("[Lobby] handleLeaveRoom called");
+    console.log("[Lobby] playerId:", playerId);
+    
+    if (!socketRef.current || !playerId) {
+      console.error("[Lobby] Cannot leave room - missing requirements");
+      return;
+    }
+
+    const confirmLeave = window.confirm("คุณแน่ใจหรือไม่ที่จะออกจากห้อง?");
+    if (!confirmLeave) {
+      console.log("[Lobby] Leave cancelled by user");
+      return;
+    }
+
+    console.log("[Lobby] Emitting leaveRoom event with:", { roomId: id, playerId: playerId });
+    socketRef.current.emit("leaveRoom", { roomId: id, playerId: playerId });
   };
 
   if (!joined && !isHost) {
@@ -314,22 +393,32 @@ const LobbyPage = () => {
                     <span className="text-gray-600 text-lg">Players</span>
                   </div>
 
-                  {/* ขวา: ปุ่ม Start (Host) หรือ Back (Player) */}
+                  {/* ขวา: ปุ่ม Start และ Delete (Host) หรือ Leave (Player) */}
                   {isHost ? (
-                    <button
-                      type="button"
-                      onClick={startGame}
-                      className="rounded-xl bg-green-500 hover:bg-green-600 text-white font-bold px-10 py-4 text-lg transition shadow-lg transform hover:scale-105"
-                    >
-                      Start
-                    </button>
+                    <div className="flex gap-3">
+                      <button
+                        type="button"
+                        onClick={handleDeleteRoom}
+                        className="rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold px-6 py-4 text-lg transition shadow-lg transform hover:scale-105"
+                        title="Delete Room"
+                      >
+                        🗑️
+                      </button>
+                      <button
+                        type="button"
+                        onClick={startGame}
+                        className="rounded-xl bg-green-500 hover:bg-green-600 text-white font-bold px-10 py-4 text-lg transition shadow-lg transform hover:scale-105"
+                      >
+                        Start
+                      </button>
+                    </div>
                   ) : (
                     <button
                       type="button"
-                      onClick={() => router.push("/")}
-                      className="rounded-xl bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-6 py-3 transition"
+                      onClick={handleLeaveRoom}
+                      className="rounded-xl bg-red-400 hover:bg-red-500 text-white font-semibold px-6 py-3 transition shadow-lg"
                     >
-                      Back
+                      Leave
                     </button>
                   )}
                 </div>

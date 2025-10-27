@@ -24,11 +24,32 @@ export function getRoom(roomId) {
   return rooms[roomId];
 }
 
+export function deleteRoom(roomId) {
+  if (rooms[roomId]) {
+    delete rooms[roomId];
+    return true;
+  }
+  return false;
+}
+
 export function addPlayer(roomId, player) {
   const room = getRoom(roomId);
   if (!room) return;
   room.players.push(player);
   room.scores[player.id] = 0;
+}
+
+export function removePlayer(roomId, playerId) {
+  const room = getRoom(roomId);
+  if (!room) return false;
+  
+  const playerIndex = room.players.findIndex(p => p.id === playerId);
+  if (playerIndex >= 0) {
+    room.players.splice(playerIndex, 1);
+    delete room.scores[playerId];
+    return true;
+  }
+  return false;
 }
 
 export function submitAnswer(roomId, playerId, guess) {
