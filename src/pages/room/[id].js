@@ -2,6 +2,8 @@ import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { getSocket } from "@/lib/socketManager";
 import QuestionCard from "@/components/QuestionCard";
+import WagerPhase from "@/components/WagerPhase";
+import PayoutPhase from "@/components/PayoutPhase";
 
 export default function RoomPage() {
   const router = useRouter();
@@ -24,6 +26,14 @@ export default function RoomPage() {
   const [roundResult, setRoundResult] = useState(null);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [isRejoining, setIsRejoining] = useState(false);
+  
+  // New state for chip-based game
+  const [chips, setChips] = useState({});
+  const [answerTiles, setAnswerTiles] = useState([]);
+  const [payoutResult, setPayoutResult] = useState(null);
+  const [currentBets, setCurrentBets] = useState([]);
+  const [confirmedWagers, setConfirmedWagers] = useState([]);
+  const [zeroChipPlayers, setZeroChipPlayers] = useState([]);
 
   const colorOptions = ["red-500", "amber-500", "emerald-500", "sky-500", "violet-500", "rose-500"];
   const colorKeyToBg = {
@@ -115,6 +125,12 @@ export default function RoomPage() {
       s.off("gameStarted");
       s.off("nextRound");
       s.off("roundResult");
+      s.off("chipsUpdate");
+      s.off("answersRevealed");
+      s.off("betsUpdate");
+      s.off("payoutResult");
+      s.off("wagersConfirmed");
+      s.off("confirmWagerError");
       
       // Set up ALL event listeners FIRST before joining
       // Listen for room updates
@@ -167,10 +183,54 @@ export default function RoomPage() {
         }
       });
       
-      // Listen for round result
+      // Listen for round result (legacy - keep for backwards compatibility)
       s.on("roundResult", (result) => {
         console.log("Round result:", result);
         setRoundResult(result);
+      });
+      
+      // Listen for chips updates
+      s.on("chipsUpdate", (updatedChips) => {
+        console.log("[Room] Chips updated:", updatedChips);
+        setChips(updatedChips);
+      });
+      
+      // Listen for answers revealed (transition to wager phase)
+      s.on("answersRevealed", (data) => {
+        console.log("[Room] Answers revealed, transitioning to wager phase:", data);
+        setAnswerTiles(data.answerTiles || []);
+        setPhase(data.phase || 'wager');
+        setZeroChipPlayers(data.zeroChipPlayers || []);
+        setConfirmedWagers([]); // 🔴 Reset confirmed wagers when entering new wager phase
+        setCurrentBets([]); // 🔴 Also reset current bets for new round
+      });
+      
+      // Listen for bets updates
+      s.on("betsUpdate", (data) => {
+        console.log("[Room] Bets updated:", data);
+        setCurrentBets(data.bets || []);
+        if (data.chips) {
+          setChips(data.chips);
+        }
+      });
+      
+      // Listen for payout results
+      s.on("payoutResult", (result) => {
+        console.log("[Room] Payout result:", result);
+        setPayoutResult(result);
+        setAnswerTiles(result.answerTiles || []);
+      });
+      
+      // Listen for wagers confirmed
+      s.on("wagersConfirmed", (data) => {
+        console.log("[Room] Wagers confirmed:", data);
+        setConfirmedWagers(data.confirmedWagers || []);
+      });
+      
+      // Listen for confirm wager errors
+      s.on("confirmWagerError", (data) => {
+        console.error("[Room] Confirm wager error:", data.error);
+        alert(data.error);
       });
       
       // NOW define the join function AFTER all listeners are set
@@ -293,12 +353,33 @@ export default function RoomPage() {
     setGuess("");
   };
 
+  const placeBet = (tileIndex, amount) => {
+    if (!socketRef.current || !clientIdRef.current) return;
+    console.log(`[Room] Placing bet: ${amount} chips on tile ${tileIndex}`);
+    socketRef.current.emit("placeBet", { 
+      roomId: id, 
+      playerId: clientIdRef.current, 
+      tileIndex, 
+      amount 
+    });
+  };
+
+  const confirmWagers = () => {
+    if (!socketRef.current || !clientIdRef.current) return;
+    console.log(`[Room] Confirming wagers for player ${clientIdRef.current}`);
+    socketRef.current.emit("confirmWagers", {
+      roomId: id,
+      playerId: clientIdRef.current
+    });
+  };
+
   const getPhaseDisplay = () => {
     const phaseLabels = {
       lobby: "🎮 กำลังรอเริ่มเกม...",
       question: "❓ ตอบคำถาม",
       reveal: "✨ เฉลยคำตอบ",
       wager: "💰 ลงเดิมพัน",
+      payout: "🎉 ประกาศผล",
       scoring: "📊 คำนวณคะแนน",
       finished: "🏆 จบเกม"
     };
@@ -343,7 +424,7 @@ export default function RoomPage() {
                 <article className="rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 shadow-lg">
                   <div className="flex items-center justify-between gap-4">
                     <div className="text-sm font-semibold">
-                      Host Controls - {phase === "question" ? "Question Phase" : phase === "reveal" ? "Reveal Phase" : "Game"}
+                      Host Controls - {getPhaseDisplay()}
                     </div>
                     <div className="flex gap-2">
                       {phase === "question" && (
@@ -351,17 +432,28 @@ export default function RoomPage() {
                           type="button"
                           onClick={() => socketRef.current?.emit("revealAnswer", { roomId: id })}
                           className="rounded-md bg-yellow-500 hover:bg-yellow-600 text-white font-bold px-4 py-2 text-sm transition"
+                          disabled
+                          title="Auto-reveals when all players answer"
                         >
-                          Reveal Answer
+                          (Auto Reveal)
                         </button>
                       )}
-                      {phase === "reveal" && (
+                      {phase === "wager" && (
+                        <button
+                          type="button"
+                          onClick={() => socketRef.current?.emit("revealAnswer", { roomId: id })}
+                          className="rounded-md bg-yellow-500 hover:bg-yellow-600 text-white font-bold px-4 py-2 text-sm transition"
+                        >
+                          🎯 Reveal Correct Answer
+                        </button>
+                      )}
+                      {(phase === "reveal" || phase === "payout") && (
                         <button
                           type="button"
                           onClick={() => socketRef.current?.emit("nextRound", { roomId: id })}
                           className="rounded-md bg-green-500 hover:bg-green-600 text-white font-bold px-4 py-2 text-sm transition"
                         >
-                          Next Round
+                          ▶️ Next Round
                         </button>
                       )}
                     </div>
@@ -458,19 +550,23 @@ export default function RoomPage() {
                     )}
 
               <div>
-                      <h3 className="text-blue-900 font-semibold mb-2">คำตอบที่ส่งแล้ว ({answers.length}/{players.length})</h3>
+                      <h3 className="text-blue-900 font-semibold mb-2">สถานะการส่งคำตอบ ({answers.length}/{players.length})</h3>
                 <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                        {answers.map((a, i) => {
-                          const player = players.find(p => p.id === a.playerId);
+                        {players.map((player, i) => {
+                          const hasAnswered = answers.some(a => a.playerId === player.id);
                           return (
-                    <li key={i} className="rounded-lg bg-blue-50 text-blue-900 text-sm px-3 py-2 shadow">
-                              <div className="flex items-center gap-2 mb-1">
-                                {player && (
-                                  <span className={`inline-flex h-2 w-2 rounded-full ${colorKeyToBg[player.color] || 'bg-gray-400'}`} />
-                                )}
+                    <li key={i} className={`rounded-lg text-sm px-3 py-2 shadow ${
+                              hasAnswered 
+                                ? 'bg-green-50 text-green-900 border border-green-200' 
+                                : 'bg-gray-50 text-gray-500 border border-gray-200'
+                            }`}>
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex h-2 w-2 rounded-full ${colorKeyToBg[player.color] || 'bg-gray-400'}`} />
                                 <span className="font-semibold text-xs">{player?.name || "???"}</span>
                               </div>
-                              <div className="font-bold">{a.guess}</div>
+                              <div className="font-bold text-center mt-1">
+                                {hasAnswered ? '✓ ส่งแล้ว' : '⏳ รอส่ง'}
+                              </div>
                     </li>
                           );
                         })}
@@ -479,7 +575,7 @@ export default function RoomPage() {
                   </>
                 )}
 
-                {/* Reveal Phase */}
+                {/* Reveal Phase - legacy, kept for backwards compatibility */}
                 {phase === "reveal" && roundResult && (
                   <div className="space-y-6">
                     <QuestionCard 
@@ -516,6 +612,36 @@ export default function RoomPage() {
                   </div>
                 )}
 
+                {/* Wager Phase */}
+                {phase === "wager" && (
+                  <WagerPhase
+                    answerTiles={answerTiles}
+                    players={players}
+                    chips={chips}
+                    myPlayerId={clientIdRef.current}
+                    onPlaceBet={placeBet}
+                    onConfirmWagers={confirmWagers}
+                    currentBets={currentBets}
+                    confirmedWagers={confirmedWagers}
+                    zeroChipPlayers={zeroChipPlayers}
+                    isHost={isHost}
+                  />
+                )}
+
+                {/* Payout Phase */}
+                {phase === "payout" && payoutResult && (
+                  <PayoutPhase
+                    correctAnswer={payoutResult.correctAnswer}
+                    winningTile={payoutResult.winningTile}
+                    answerTiles={payoutResult.answerTiles}
+                    payouts={payoutResult.payouts}
+                    chips={payoutResult.chips}
+                    players={players}
+                    currentQuestion={currentQuestion}
+                    myPlayerId={clientIdRef.current}
+                  />
+                )}
+
                 {/* Finished Phase */}
                 {phase === "finished" && (
                   <div className="text-center py-8">
@@ -546,39 +672,53 @@ export default function RoomPage() {
             </div>
           ) : (
             <div className="space-y-2 max-h-[600px] overflow-y-auto">
-              {players.map((p, i) => {
-                const playerColor = p && typeof p === 'object' && p.color ? colorKeyToBg[p.color] ?? 'bg-gray-400' : 'bg-gray-400';
-                const playerName = typeof p === "object" ? p.name ?? "Player" : String(p);
-                const playerScore = roundResult?.scores?.[p.id] || 0;
-                
-                return (
-                  <div 
-                    key={i} 
-                    className="group relative bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl px-4 py-3 transition-all hover:shadow-md hover:scale-[1.02] border border-blue-200"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        {/* Player Color Badge */}
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-full ${playerColor} shadow-md flex items-center justify-center text-white font-bold text-xs`}>
-                          {i + 1}
+              {players
+                .sort((a, b) => (chips[b.id] || 0) - (chips[a.id] || 0))
+                .map((p, i) => {
+                  const playerColor = p && typeof p === 'object' && p.color ? colorKeyToBg[p.color] ?? 'bg-gray-400' : 'bg-gray-400';
+                  const playerName = typeof p === "object" ? p.name ?? "Player" : String(p);
+                  const playerChips = chips[p.id] || 0;
+                  
+                  return (
+                    <div 
+                      key={i} 
+                      className={`group relative rounded-xl px-4 py-3 transition-all hover:shadow-md hover:scale-[1.02] border ${
+                        i === 0 ? 'bg-gradient-to-br from-yellow-100 to-yellow-50 border-yellow-400' :
+                        i === 1 ? 'bg-gradient-to-br from-gray-100 to-gray-50 border-gray-300' :
+                        i === 2 ? 'bg-gradient-to-br from-orange-100 to-orange-50 border-orange-300' :
+                        'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          {/* Rank Badge */}
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full ${playerColor} shadow-md flex items-center justify-center text-white font-bold text-xs`}>
+                            {i + 1}
+                          </div>
+                          
+                          {/* Player Name */}
+                          <span className="text-blue-900 font-semibold truncate">
+                            {playerName}
+                            {p.id === clientIdRef.current && " (คุณ)"}
+                          </span>
                         </div>
                         
-                        {/* Player Name */}
-                        <span className="text-blue-900 font-semibold truncate">
-                          {playerName}
-                        </span>
-                      </div>
-                      
-                      {/* Score Badge (if game started) */}
-                      {roundResult?.scores && (
-                        <div className="flex-shrink-0 bg-yellow-400 text-blue-900 font-bold text-sm px-3 py-1 rounded-full shadow-sm">
-                          {playerScore}
+                        {/* Chips Display */}
+                        <div className="flex-shrink-0 flex items-center gap-1">
+                          <span className="text-xl">🪙</span>
+                          <span className={`font-bold text-sm ${
+                            i === 0 ? 'text-yellow-700' :
+                            i === 1 ? 'text-gray-700' :
+                            i === 2 ? 'text-orange-700' :
+                            'text-blue-700'
+                          }`}>
+                            {playerChips}
+                          </span>
                         </div>
-                      )}
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
             </aside>
