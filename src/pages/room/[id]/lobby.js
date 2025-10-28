@@ -14,13 +14,13 @@ const LobbyPage = () => {
   const [hostId, setHostId] = useState(null);
   const [playerId, setPlayerId] = useState(null);
   const [nickname, setNickname] = useState("");
-  const [color, setColor] = useState("#3B82F6");
+  const [color, setColor] = useState("#DC2626");
   const [joined, setJoined] = useState(false);
   const [players, setPlayers] = useState([]);
   const [phase, setPhase] = useState("lobby");
   const [isRejoining, setIsRejoining] = useState(false);
 
-  // ฟังก์ชันสุ่มสี
+  // Random color function
   const getRandomColor = () => {
     const colors = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"];
     return colors[Math.floor(Math.random() * colors.length)];
@@ -253,7 +253,7 @@ const LobbyPage = () => {
       setIsHost(true);
       setHostId(urlHostId);
       setJoined(true);
-      setIsRejoining(false); // Host ใหม่ไม่ต้องแสดง "กำลังเชื่อมต่อใหม่"
+      setIsRejoining(false); // New host doesn't need to show "Reconnecting"
 
       // Save both formats for compatibility
       sessionStorage.setItem(`room_${id}_isHost`, "true");
@@ -277,7 +277,7 @@ const LobbyPage = () => {
   // Join Room function for players
   const joinRoom = () => {
     if (!nickname.trim()) {
-      alert("กรุณาใส่ชื่อ");
+      alert("Please enter a name");
       return;
     }
 
@@ -349,7 +349,7 @@ const LobbyPage = () => {
       return;
     }
     
-    const confirmDelete = window.confirm("คุณแน่ใจหรือไม่ที่จะลบห้องนี้? ผู้เล่นทุกคนจะถูกนำกลับไปหน้าแรก");
+    const confirmDelete = window.confirm("Are you sure you want to delete this room? All players will be redirected to home page");
     if (!confirmDelete) {
       console.log("[Lobby] Delete cancelled by user");
       return;
@@ -369,7 +369,7 @@ const LobbyPage = () => {
       return;
     }
 
-    const confirmLeave = window.confirm("คุณแน่ใจหรือไม่ที่จะออกจากห้อง?");
+    const confirmLeave = window.confirm("Are you sure you want to leave this room?");
     if (!confirmLeave) {
       console.log("[Lobby] Leave cancelled by user");
       return;
@@ -382,10 +382,26 @@ const LobbyPage = () => {
   if (!joined && !isHost) {
     // Player Join Form
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 flex items-center justify-center p-4">
-        <article className="rounded-2xl bg-white shadow-2xl p-8 max-w-md w-full">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2 text-center">เข้าร่วมห้อง</h1>
-          <p className="text-center text-gray-600 mb-6">รหัสห้อง: <span className="font-mono font-bold text-purple-600">{id}</span></p>
+      <div className="relative min-h-screen bg-yellow-200 flex items-center justify-center p-4 overflow-hidden">
+        {/* Radial gradient base - like landing page */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_50%_50%,#fde047_0%,#facc15_35%,#eab308_60%,#ca8a04_100%)] [mask-image:radial-gradient(circle_at_50%_50%,rgba(0,0,0,1)_0%,rgba(0,0,0,0.85)_35%,rgba(0,0,0,0.6)_60%,rgba(0,0,0,0.25)_100%)]"
+        />
+        
+        {/* Subtle sunburst stripes */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute left-1/2 top-1/2 w-[200vmax] h-[200vmax] -translate-x-1/2 -translate-y-1/2"
+        >
+          <div
+            className="sunburst-rotate w-full h-full [background:repeating-conic-gradient(from_0deg_at_50%_50%,rgba(255,255,255,0.15)_0deg,rgba(255,255,255,0.15)_12deg,rgba(255,255,255,0)_12deg,rgba(255,255,255,0)_28deg)]"
+          />
+        </div>
+
+        <article className="relative z-10 rounded-2xl bg-white shadow-2xl p-8 max-w-md w-full">
+          <h1 className="text-3xl font-bold text-black mb-2 text-center">Join Room</h1>
+          <p className="text-center text-black mb-6">Room Code: <span className="font-mono font-bold text-blue-700">{id}</span></p>
           
           <form
             onSubmit={(e) => {
@@ -395,8 +411,8 @@ const LobbyPage = () => {
             className="space-y-4"
           >
             <div>
-              <label htmlFor="nickname" className="block text-sm font-medium text-gray-700 mb-2">
-                ชื่อของคุณ
+              <label htmlFor="nickname" className="block text-sm font-medium text-black mb-2">
+                Your Name
               </label>
               <input
                 id="nickname"
@@ -404,23 +420,23 @@ const LobbyPage = () => {
                 value={nickname}
                 onChange={(e) => setNickname(e.target.value)}
                 className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none"
-                placeholder="ใส่ชื่อของคุณ"
+                placeholder="Enter your name"
                 maxLength={20}
               />
             </div>
 
             <div>
-              <label htmlFor="color" className="block text-sm font-medium text-gray-700 mb-2">
-                เลือกสี
+              <label htmlFor="color" className="block text-sm font-medium text-black mb-2">
+                Choose Color
               </label>
-              <div className="flex gap-2">
-                {["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899"].map((c) => (
+              <div className="flex gap-2 flex-wrap">
+                {["#DC2626", "#EA580C", "#CA8A04", "#16A34A", "#0284C7", "#7C3AED", "#DB2777"].map((c) => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => setColor(c)}
                     className={`w-10 h-10 rounded-full border-2 ${
-                      color === c ? "border-gray-800 scale-110" : "border-gray-300"
+                      color === c ? "border-black scale-110" : "border-gray-300"
                     } transition`}
                     style={{ backgroundColor: c }}
                     aria-label={`Select color ${c}`}
@@ -431,9 +447,9 @@ const LobbyPage = () => {
 
             <button
               type="submit"
-              className="w-full rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 transition"
+              className="w-full rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 transition"
             >
-              เข้าร่วม
+              Join
             </button>
           </form>
         </article>
@@ -443,35 +459,48 @@ const LobbyPage = () => {
 
   // Lobby view (for both host and players)
   return (
-    <div className="relative min-h-screen bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 overflow-hidden">
-      {/* Background decorations */}
-      <div className="absolute inset-0 opacity-20">
-        <div className="absolute top-10 left-10 w-32 h-32 bg-white rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-20 w-40 h-40 bg-yellow-300 rounded-full blur-3xl animate-pulse delay-75" />
-        <div className="absolute top-1/2 left-1/3 w-24 h-24 bg-pink-300 rounded-full blur-2xl animate-pulse delay-150" />
+    <div className="relative min-h-screen bg-yellow-200 overflow-hidden">
+      {/* Radial gradient base - like landing page */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_50%_50%,#fde047_0%,#facc15_35%,#eab308_60%,#ca8a04_100%)] [mask-image:radial-gradient(circle_at_50%_50%,rgba(0,0,0,1)_0%,rgba(0,0,0,0.85)_35%,rgba(0,0,0,0.6)_60%,rgba(0,0,0,0.25)_100%)]"
+      />
+      
+      {/* Subtle sunburst stripes */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-1/2 w-[200vmax] h-[200vmax] -translate-x-1/2 -translate-y-1/2"
+      >
+        <div
+          className="sunburst-rotate w-full h-full [background:repeating-conic-gradient(from_0deg_at_50%_50%,rgba(255,255,255,0.15)_0deg,rgba(255,255,255,0.15)_12deg,rgba(255,255,255,0)_12deg,rgba(255,255,255,0)_28deg)]"
+        />
       </div>
 
-      {/* Floating icons */}
+      {/* Subtle geometric shapes - reduced and softer */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 left-1/4 text-6xl animate-float">🎮</div>
-        <div className="absolute top-40 right-1/4 text-5xl animate-float delay-100">🎯</div>
-        <div className="absolute bottom-32 left-1/3 text-4xl animate-float delay-200">✨</div>
+        {/* Large soft shapes */}
+        <div className="absolute -top-20 -left-20 w-64 h-64 sm:w-80 sm:h-80 md:w-96 md:h-96 bg-amber-400 opacity-10 transform rotate-45 rounded-3xl" />
+        <div className="absolute -bottom-32 -right-32 w-80 h-80 sm:w-96 sm:h-96 md:w-[400px] md:h-[400px] lg:w-[500px] lg:h-[500px] bg-amber-500 opacity-[0.08] transform -rotate-12 rounded-full" />
+        
+        {/* Small accent shapes - very subtle */}
+        <div className="hidden md:block absolute top-1/4 right-10 w-48 h-48 bg-yellow-500 opacity-[0.08] transform rotate-12 rounded-2xl" />
+        <div className="hidden lg:block absolute bottom-1/3 left-20 w-60 h-60 bg-amber-400 opacity-[0.08] transform -rotate-45 rounded-tr-full" />
       </div>
 
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-12">
-        <article className="rounded-3xl bg-white shadow-2xl w-full max-w-3xl overflow-hidden">
+      <div className="relative z-10 min-h-screen flex flex-col items-center justify-start">
+        <article className="w-full overflow-hidden">
           {isRejoining ? (
             <div className="text-center py-16">
               <div className="text-6xl mb-4">🔄</div>
-              <h2 className="text-3xl font-bold text-gray-800 mb-2">
-                กำลังเชื่อมต่อใหม่...
+              <h2 className="text-3xl font-bold text-black mb-2">
+                Reconnecting...
               </h2>
-              <p className="text-gray-600">กรุณารอสักครู่</p>
+              <p className="text-black">Please wait</p>
             </div>
           ) : (
             <>
               {/* 1. Game PIN - Room Code at Top */}
-              <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white py-12 text-center">
+              <div className="bg-black/90 text-white py-8 text-center">
                 <p className="text-sm font-medium uppercase tracking-wider mb-2 opacity-90">
                   Game PIN
                 </p>
@@ -485,11 +514,11 @@ const LobbyPage = () => {
                 <div className="w-full flex items-center justify-between mb-6">
                   {/* ซ้าย: จำนวน Players */}
                   <div className="flex items-center gap-2">
-                    <svg className="w-7 h-7 text-gray-700" fill="currentColor" viewBox="0 0 20 20">
+                    <svg className="w-7 h-7 text-black" fill="currentColor" viewBox="0 0 20 20">
                       <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
                     </svg>
-                    <span className="text-3xl font-bold text-gray-800">{players.length}</span>
-                    <span className="text-gray-600 text-lg">Players</span>
+                    <span className="text-3xl font-bold text-black">{players.length}</span>
+                    <span className="text-black text-lg">Players</span>
                   </div>
 
                   {/* ขวา: ปุ่ม Start และ Delete (Host) หรือ Leave (Player) */}
@@ -498,15 +527,15 @@ const LobbyPage = () => {
                       <button
                         type="button"
                         onClick={handleDeleteRoom}
-                        className="rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold px-6 py-4 text-lg transition shadow-lg transform hover:scale-105"
+                        className="rounded-xl bg-black/90 hover:bg-red-600 text-white font-bold px-6 py-4 text-lg transition shadow-lg transform hover:scale-105"
                         title="Delete Room"
                       >
-                        🗑️
+                        Delete Room
                       </button>
                       <button
                         type="button"
                         onClick={startGame}
-                        className="rounded-xl bg-green-500 hover:bg-green-600 text-white font-bold px-10 py-4 text-lg transition shadow-lg transform hover:scale-105"
+                        className="rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold px-10 py-4 text-lg transition shadow-lg transform hover:scale-105"
                       >
                         Start
                       </button>
@@ -515,7 +544,7 @@ const LobbyPage = () => {
                     <button
                       type="button"
                       onClick={handleLeaveRoom}
-                      className="rounded-xl bg-red-400 hover:bg-red-500 text-white font-semibold px-6 py-3 transition shadow-lg"
+                      className="rounded-xl bg-black/90 hover:bg-red-500 text-white font-semibold px-6 py-3 transition shadow-lg"
                     >
                       Leave
                     </button>
@@ -527,17 +556,17 @@ const LobbyPage = () => {
                   {players.length === 0 ? (
                     <div className="text-center py-12">
                       <div className="text-5xl mb-4">👥</div>
-                      <p className="text-gray-500 text-lg">
-                        {isHost ? "รอผู้เล่นเข้าร่วม..." : "กำลังเชื่อมต่อ..."}
+                      <p className="text-black text-lg">
+                        {isHost ? "Waiting for players..." : "Connecting..."}
                       </p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                    <div className="flex flex-row flex-wrap gap-3 justify-center">
                       {players.map((p) => (
                         <div
                           key={p.id}
-                          className="rounded-xl p-4 text-center font-semibold text-white shadow-md transform hover:scale-105 transition"
-                          style={{ backgroundColor: p.color }}
+                          className="rounded-full px-6 py-3 text-center font-semibold bg-white/90 shadow-md transform hover:scale-105 transition backdrop-blur-sm"
+                          style={{ color: p.color }}
                         >
                           {p.name}
                         </div>
@@ -549,12 +578,12 @@ const LobbyPage = () => {
                 {/* Host/Player Messages */}
                 <div className="mt-8 text-center">
                   {isHost ? (
-                    <p className="text-gray-600">
-                      คุณคือ <span className="font-bold text-purple-600">Host</span> - กดปุ่ม Start เพื่อเริ่มเกม
+                    <p className="text-black">
+                      {"You are "}<span className="font-bold text-blue-700">Host</span>{" - Press Start to begin game"}
                     </p>
                   ) : (
-                    <p className="text-gray-600">
-                      รอ Host เริ่มเกม...
+                    <p className="text-black">
+                      Waiting for Host to start game...
                     </p>
                   )}
                 </div>
@@ -565,24 +594,12 @@ const LobbyPage = () => {
       </div>
 
       <style jsx>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-20px); }
+        @keyframes sunburst-rotate {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
-        .animate-float {
-          animation: float 3s ease-in-out infinite;
-        }
-        .delay-75 {
-          animation-delay: 0.75s;
-        }
-        .delay-100 {
-          animation-delay: 1s;
-        }
-        .delay-150 {
-          animation-delay: 1.5s;
-        }
-        .delay-200 {
-          animation-delay: 2s;
+        .sunburst-rotate {
+          animation: sunburst-rotate 60s linear infinite;
         }
       `}</style>
     </div>

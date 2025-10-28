@@ -375,13 +375,13 @@ export default function RoomPage() {
 
   const getPhaseDisplay = () => {
     const phaseLabels = {
-      lobby: "🎮 กำลังรอเริ่มเกม...",
-      question: "❓ ตอบคำถาม",
-      reveal: "✨ เฉลยคำตอบ",
-      wager: "💰 ลงเดิมพัน",
-      payout: "🎉 ประกาศผล",
-      scoring: "📊 คำนวณคะแนน",
-      finished: "🏆 จบเกม"
+      lobby: "🎮 Waiting to Start...",
+      question: "❓ Answer Question",
+      reveal: "✨ Reveal Answer",
+      wager: "💰 Place Wagers",
+      payout: "🎉 Results",
+      scoring: "📊 Calculate Score",
+      finished: "🏆 Game Finished"
     };
     return phaseLabels[phase] || phase;
   };
@@ -467,9 +467,9 @@ export default function RoomPage() {
                   <div className="text-center py-8">
                     <div className="text-5xl mb-4">🔄</div>
                     <h2 className="text-2xl font-bold text-blue-900 mb-2">
-                      กำลังเชื่อมต่อใหม่...
+                      Reconnecting...
                     </h2>
-                    <p className="text-blue-900/60">กรุณารอสักครู่</p>
+                    <p className="text-blue-900/60">Please wait</p>
                   </div>
                 )}
 
@@ -479,14 +479,14 @@ export default function RoomPage() {
                     <input
                       id="nickname"
                       type="text"
-                      placeholder="ใส่ชื่อของคุณ"
+                      placeholder="Enter your name"
                       value={nickname}
                       onChange={(e) => setNickname(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && joinRoom()}
                       className="flex-1 rounded-full border border-blue-300 px-5 py-3 text-blue-900 placeholder-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
                     />
                     <div>
-                      <p className="text-blue-900/80 text-sm mb-2">เลือกสีของคุณ</p>
+                      <p className="text-blue-900/80 text-sm mb-2">Choose your color</p>
                       <div className="flex flex-wrap gap-2">
                         {colorOptions.map((key) => (
                           <button
@@ -504,7 +504,7 @@ export default function RoomPage() {
                       onClick={joinRoom}
                       className="rounded-full bg-blue-700 hover:bg-blue-800 text-white font-semibold px-6 py-3 shadow-md transition"
                     >
-                      เข้าร่วมห้อง
+                      Join Room
                     </button>
                   </div>
                 )}
@@ -524,11 +524,11 @@ export default function RoomPage() {
                     {!isHost && (
                       !hasSubmitted ? (
               <div className="flex flex-col sm:flex-row items-center gap-3">
-                          <label htmlFor="guess" className="sr-only">คำตอบของคุณ</label>
+                          <label htmlFor="guess" className="sr-only">Your Answer</label>
                 <input
                   id="guess"
                   type="number"
-                            placeholder="ใส่คำตอบเป็นตัวเลข"
+                            placeholder="Enter number answer"
                   value={guess}
                   onChange={(e) => setGuess(e.target.value)}
                             onKeyDown={(e) => e.key === "Enter" && submitAnswer()}
@@ -539,18 +539,18 @@ export default function RoomPage() {
                   onClick={submitAnswer}
                   className="rounded-full bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 shadow-md transition"
                 >
-                            ส่งคำตอบ
+                            Submit Answer
                 </button>
               </div>
                       ) : (
                         <div className="text-center py-4 bg-green-50 rounded-xl border border-green-200">
-                          <span className="text-green-700 font-semibold">✓ ส่งคำตอบแล้ว</span>
+                          <span className="text-green-700 font-semibold">✓ Answer Submitted</span>
                         </div>
                       )
                     )}
 
               <div>
-                      <h3 className="text-blue-900 font-semibold mb-2">สถานะการส่งคำตอบ ({answers.length}/{players.length})</h3>
+                      <h3 className="text-blue-900 font-semibold mb-2">Answer Status ({answers.length}/{players.length})</h3>
                 <ul className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                         {players.map((player, i) => {
                           const hasAnswered = answers.some(a => a.playerId === player.id);
@@ -565,7 +565,7 @@ export default function RoomPage() {
                                 <span className="font-semibold text-xs">{player?.name || "???"}</span>
                               </div>
                               <div className="font-bold text-center mt-1">
-                                {hasAnswered ? '✓ ส่งแล้ว' : '⏳ รอส่ง'}
+                                {hasAnswered ? '✓ Submitted' : '⏳ Waiting'}
                               </div>
                     </li>
                           );
@@ -646,8 +646,8 @@ export default function RoomPage() {
                 {phase === "finished" && (
                   <div className="text-center py-8">
                     <div className="text-6xl mb-4">🏆</div>
-                    <h2 className="text-3xl font-bold text-blue-900 mb-4">จบเกม!</h2>
-                    <p className="text-blue-900/60 mb-6">ดูกระดานคะแนนด้านข้าง</p>
+                    <h2 className="text-3xl font-bold text-blue-900 mb-4">Game Finished!</h2>
+                    <p className="text-blue-900/60 mb-6">Check the leaderboard on the side</p>
                   </div>
                 )}
                   </div>
@@ -658,7 +658,7 @@ export default function RoomPage() {
             {/* Players Sidebar - Kahoot Style */}
             <aside className="rounded-2xl bg-white/90 backdrop-blur shadow-xl border border-yellow-200 p-6">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-blue-900 font-bold text-lg">ผู้เล่น</h3>
+            <h3 className="text-blue-900 font-bold text-lg">Players</h3>
             <div className="flex items-center gap-1 bg-blue-100 rounded-full px-3 py-1">
               <span className="text-blue-900 font-bold">{players.length}</span>
             </div>
@@ -667,8 +667,8 @@ export default function RoomPage() {
           {players.length === 0 ? (
             <div className="text-center py-12 text-blue-900/50 text-sm">
               <div className="text-5xl mb-3">👥</div>
-              <p className="font-semibold">ยังไม่มีผู้เล่น</p>
-              <p className="text-xs mt-2">รอผู้เล่นเข้าร่วม...</p>
+              <p className="font-semibold">No players yet</p>
+              <p className="text-xs mt-2">Waiting for players...</p>
             </div>
           ) : (
             <div className="space-y-2 max-h-[600px] overflow-y-auto">

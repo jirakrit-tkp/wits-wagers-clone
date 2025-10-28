@@ -12,9 +12,9 @@ const QuestionCard = ({ question, round, totalRounds }) => {
 
   const getCategoryLabel = (category) => {
     const labels = {
-      general: "ทั่วไป",
-      entertainment: "บันเทิง",
-      dirty: "สนุกสนาน",
+      general: "General",
+      entertainment: "Entertainment",
+      dirty: "Fun",
     };
     return labels[category] || category;
   };
@@ -27,7 +27,7 @@ const QuestionCard = ({ question, round, totalRounds }) => {
           {getCategoryLabel(question.category)}
         </span>
         <span className="text-blue-900/60 font-semibold text-sm">
-          คำถามที่ {round} / {totalRounds}
+          Question {round} / {totalRounds}
         </span>
       </header>
 
@@ -39,7 +39,7 @@ const QuestionCard = ({ question, round, totalRounds }) => {
 
       <footer className="mt-4 flex items-center justify-center gap-2 text-blue-900/50 text-sm">
         <span>💡</span>
-        <span>ตอบเป็นตัวเลขเท่านั้น</span>
+        <span>Answer in numbers only</span>
       </footer>
     </article>
   );

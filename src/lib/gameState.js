@@ -246,7 +246,7 @@ export function confirmWager(roomId, playerId) {
     const hasZeroChipBet = room.bets.some(b => b.playerId === playerId && b.isZeroChipBet);
     if (!hasZeroChipBet) {
       console.log(`[gameState] ❌ Player ${playerId} (zero chips at start) must place a bet before confirming`);
-      return { success: false, error: 'คุณต้องเลือกช่องเดิมพัน 1 ช่องก่อนยืนยัน' };
+      return { success: false, error: 'You must select 1 betting tile before confirming' };
     }
   }
   

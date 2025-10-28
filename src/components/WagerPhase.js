@@ -42,7 +42,7 @@ const WagerPhase = ({
     const amount = parseInt(value) || 0;
     
     if (amount < 0) {
-      setError("จำนวนชิปต้องเป็นบวก");
+      setError("Amount must be positive");
       return;
     }
     
@@ -50,7 +50,7 @@ const WagerPhase = ({
     const newTotal = Object.values(newBets).reduce((sum, amt) => sum + amt, 0);
     
     if (newTotal > myChips) {
-      setError(`มีชิปไม่พอ! เหลือ ${myChips} ชิป`);
+      setError(`Not enough chips! You have ${myChips} chips`);
       return;
     }
     
@@ -81,16 +81,16 @@ const WagerPhase = ({
     
     // Get tile info for confirmation message
     const tile = answerTiles[tileIndex];
-    const tileName = tile?.isSmallerTile ? 'น้อยกว่าคำตอบทั้งหมด' : tile?.guess;
+    const tileName = tile?.isSmallerTile ? 'Smaller than all' : tile?.guess;
     const bonusMessage = allPlayersZeroChip 
-      ? 'ถ้าถูกจะได้ 250 ชิป'
-      : 'ถ้าถูกจะได้ 25% ของรางวัลสูงสุด';
+      ? 'If correct, you get 250 chips'
+      : 'If correct, you get 25% of max prize';
     
     // Show confirmation dialog
     const confirmed = window.confirm(
-      `ยืนยันการเลือกช่อง "${tileName}"?\n\n` +
+      `Confirm selection "${tileName}"?\n\n` +
       `${bonusMessage}\n` +
-      `(เลือกแล้วจะเปลี่ยนไม่ได้)`
+      `(Cannot change after selection)`
     );
     
     if (!confirmed) {
@@ -111,7 +111,7 @@ const WagerPhase = ({
   if (!answerTiles || answerTiles.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-blue-900">กำลังโหลดตัวเลือกเดิมพัน...</p>
+        <p className="text-blue-900">Loading betting options...</p>
       </div>
     );
   }
@@ -128,36 +128,36 @@ const WagerPhase = ({
           <div className="text-center">
             <div className="text-5xl mb-3">{hasSelectedTile ? '✅' : '🎁'}</div>
             <h3 className="text-white text-2xl font-bold mb-2">
-              {hasSelectedTile ? 'เลือกช่องแล้ว!' : 'โอกาสพิเศษ!'}
+              {hasSelectedTile ? 'Tile Selected!' : 'Special Chance!'}
             </h3>
             {hasSelectedTile && myZeroChipBet ? (
               <>
                 <p className="text-white mb-2">
-                  คุณเลือกช่อง: <span className="font-bold text-3xl">{myZeroChipBet.tileIndex === 0 ? 'น้อยกว่าทั้งหมด' : answerTiles[myZeroChipBet.tileIndex]?.guess}</span>
+                  {"You selected: "}<span className="font-bold text-3xl">{myZeroChipBet.tileIndex === 0 ? 'Smaller than all' : answerTiles[myZeroChipBet.tileIndex]?.guess}</span>
                 </p>
                 <p className="text-green-100 text-sm">
                   {allPlayersZeroChip 
-                    ? '🌟 ถ้าถูกจะได้ 250 ชิป 🌟'
-                    : '🌟 ถ้าถูกจะได้ 25% ของรางวัลสูงสุด 🌟'
+                    ? '🌟 If correct, get 250 chips 🌟'
+                    : '🌟 If correct, get 25% of max prize 🌟'
                   }
                 </p>
               </>
             ) : (
               <>
                 <p className="text-purple-100 mb-3">
-                  คุณหมดชิป แต่ยังมีโอกาสได้รับรางวัล!
+                  {"You're out of chips, but still have a chance to win!"}
                 </p>
                 <p className="text-white font-semibold text-lg mb-2">
-                  🎯 คลิกเลือก 1 ช่อง
+                  🎯 Click to select 1 tile
                 </p>
                 <p className="text-white text-sm">
                   {allPlayersZeroChip 
-                    ? '🌟 ถ้าเลือกถูก → ได้ 250 ชิป 🌟'
-                    : '🌟 ถ้าเลือกถูก → ได้ 25% ของรางวัลสูงสุด 🌟'
+                    ? '🌟 If correct → Get 250 chips 🌟'
+                    : '🌟 If correct → Get 25% of max prize 🌟'
                   }
                 </p>
                 <p className="text-purple-100 text-xs mt-2">
-                  (เลือกผิดไม่ได้อะไร แต่ยังเล่นต่อได้)
+                  {"(If wrong, no penalty but can continue playing)"}
                 </p>
               </>
             )}
@@ -169,23 +169,23 @@ const WagerPhase = ({
       <article className="rounded-xl bg-gradient-to-r from-yellow-400 to-yellow-500 p-4 shadow-lg">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-yellow-900 text-sm font-medium">ชิปตอนนี้</p>
+            <p className="text-yellow-900 text-sm font-medium">Current Chips</p>
             <p className="text-3xl font-bold text-white">{myChips} 🪙</p>
           </div>
           {totalPlacedBet > 0 && (
             <div className="text-right">
-              <p className="text-yellow-900 text-sm font-medium">วางแล้ว</p>
+              <p className="text-yellow-900 text-sm font-medium">Placed</p>
               <p className="text-2xl font-bold text-green-700">{totalPlacedBet} 🪙</p>
             </div>
           )}
           {totalPendingBet > 0 && (
             <div className="text-right">
-              <p className="text-yellow-900 text-sm font-medium">จะวาง</p>
+              <p className="text-yellow-900 text-sm font-medium">Pending</p>
               <p className="text-2xl font-bold text-orange-700">{totalPendingBet} 🪙</p>
             </div>
           )}
           <div className="text-right">
-            <p className="text-yellow-900 text-sm font-medium">เหลือหลังวาง</p>
+            <p className="text-yellow-900 text-sm font-medium">After Bet</p>
             <p className={`text-2xl font-bold ${remainingChips < 0 ? 'text-red-600' : 'text-white'}`}>
               {remainingChips} 🪙
             </p>
@@ -201,9 +201,9 @@ const WagerPhase = ({
 
       {/* Answer Tiles Grid */}
       <div>
-        <h3 className="text-blue-900 font-bold text-lg mb-3">🎯 เลือกเดิมพัน</h3>
+        <h3 className="text-blue-900 font-bold text-lg mb-3">🎯 Place Bets</h3>
         <p className="text-blue-900/60 text-sm mb-4">
-          คลิกตัวเลขแต่ละช่องเพื่อเดิมพัน คูณชิปได้ตามตัวเลข multiplier
+          Click on each number to bet. Chips are multiplied by the multiplier
         </p>
         
          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -245,12 +245,12 @@ const WagerPhase = ({
                   <div className="text-right">
                     {isSelectedByZeroChip && (
                       <span className="block text-purple-600 text-xs font-semibold">
-                        🎁 เลือกแล้ว
+                        🎁 Selected
                       </span>
                     )}
                     {placedBet > 0 && !isSelectedByZeroChip && (
                       <span className="block text-green-600 text-xs font-semibold">
-                        ✅ วางแล้ว {placedBet} 🪙
+                        ✅ Placed {placedBet} 🪙
                       </span>
                     )}
                     {totalBetOnTile > 0 && !isSelectedByZeroChip && (
@@ -291,11 +291,11 @@ const WagerPhase = ({
                   <div>
                     {placedBet > 0 && (
                       <div className="mb-2 text-center text-xs text-green-700 font-semibold">
-                        เดิมพันช่องนี้แล้ว {placedBet} ชิป
+                        Already bet {placedBet} chips on this tile
                       </div>
                     )}
                     <label htmlFor={`bet-${index}`} className="sr-only">
-                      จำนวนชิปที่จะเดิมพันเพิ่ม
+                      Additional chips to bet
                     </label>
                     <input
                       id={`bet-${index}`}
@@ -314,7 +314,7 @@ const WagerPhase = ({
                 {!isHost && isZeroChipPlayer && !hasSelectedTile && (
                   <div className="text-center py-2">
                     <div className="text-purple-600 text-sm font-semibold">
-                      👆 คลิกเพื่อเลือก
+                      👆 Click to select
                     </div>
                   </div>
                 )}
@@ -322,7 +322,7 @@ const WagerPhase = ({
                 {!isHost && isSelectedByZeroChip && (
                   <div className="text-center py-2">
                     <div className="text-purple-600 text-sm font-bold">
-                      ✅ คุณเลือกช่องนี้
+                      ✅ You selected this tile
                     </div>
                   </div>
                 )}
@@ -334,7 +334,7 @@ const WagerPhase = ({
 
       {/* Confirmation Status */}
       <article className="rounded-xl bg-blue-50 border border-blue-200 p-4">
-        <h3 className="text-blue-900 font-bold text-sm mb-3">📊 สถานะการยืนยัน</h3>
+        <h3 className="text-blue-900 font-bold text-sm mb-3">📊 Confirmation Status</h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
           {players.map((player) => {
             const confirmed = confirmedWagers?.includes(player.id) || false;
@@ -354,7 +354,7 @@ const WagerPhase = ({
           })}
         </div>
         <div className="mt-3 text-center text-sm font-semibold text-blue-700">
-          {confirmedCount}/{totalPlayers} ยืนยันแล้ว
+          {confirmedCount}/{totalPlayers} Confirmed
         </div>
       </article>
 
@@ -368,7 +368,7 @@ const WagerPhase = ({
               onClick={handlePlaceBets}
               className="w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold px-6 py-4 shadow-lg transition transform hover:scale-105"
             >
-              📍 วางเดิมพัน ({totalPendingBet} ชิป)
+              📍 Place Bets ({totalPendingBet} chips)
             </button>
           )}
 
@@ -380,7 +380,7 @@ const WagerPhase = ({
                 disabled
                 className="w-full rounded-xl bg-gray-400 text-white font-bold px-6 py-4 shadow-lg cursor-not-allowed opacity-50"
               >
-                ⚠️ เลือกช่องก่อนยืนยัน
+                ⚠️ Select a tile before confirming
               </button>
             ) : (
               <button
@@ -388,17 +388,17 @@ const WagerPhase = ({
                 onClick={handleConfirmWagers}
                 className="w-full rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-4 shadow-lg transition transform hover:scale-105"
               >
-                ✅ ยืนยันการเดิมพัน
+                ✅ Confirm Wagers
                 {isZeroChipPlayer 
-                  ? ' (เลือกช่องแล้ว)' 
+                  ? ' (Tile Selected)' 
                   : totalPlacedBet > 0 
-                  ? ` (วางไปแล้ว ${totalPlacedBet} ชิป)` 
+                  ? ` (Placed ${totalPlacedBet} chips)` 
                   : ''}
               </button>
             )
           ) : (
             <div className="w-full rounded-xl bg-green-100 border-2 border-green-500 text-green-700 font-bold px-6 py-4 text-center">
-              ✅ คุณยืนยันแล้ว - รอผู้เล่นคนอื่น ({confirmedCount}/{totalPlayers})
+              ✅ You confirmed - Waiting for others ({confirmedCount}/{totalPlayers})
             </div>
           )}
         </>
@@ -408,7 +408,7 @@ const WagerPhase = ({
       {isHost && (
         <div className="text-center py-4 bg-purple-100 rounded-xl border border-purple-300">
           <p className="text-purple-900 font-semibold">
-            👑 คุณคือ Host - รอผู้เล่นยืนยันการเดิมพัน ({confirmedCount}/{totalPlayers})
+            👑 You are Host - Waiting for players to confirm wagers ({confirmedCount}/{totalPlayers})
           </p>
         </div>
       )}
