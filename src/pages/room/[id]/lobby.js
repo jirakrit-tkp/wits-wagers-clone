@@ -1,6 +1,7 @@
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { getSocket } from "@/lib/socketManager";
+import questionsData from "@/lib/questions.json";
 
 const LobbyPage = () => {
   const router = useRouter();
@@ -19,6 +20,27 @@ const LobbyPage = () => {
   const [players, setPlayers] = useState([]);
   const [phase, setPhase] = useState("lobby");
   const [isRejoining, setIsRejoining] = useState(false);
+  const availableCategories = Object.keys(questionsData);
+  const [selectedCategories, setSelectedCategories] = useState(availableCategories);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [dropdownOpen]);
 
   // Random color function
   const getRandomColor = () => {
@@ -27,28 +49,20 @@ const LobbyPage = () => {
   };
 
   useEffect(() => {
-    console.log(`[Lobby] useEffect triggered for room: ${id}, hasJoined: ${hasJoinedRoomRef.current}, currentRoom: ${currentRoomIdRef.current}`);
     if (!id) return;
     
     // If room changed, reset flag
     if (currentRoomIdRef.current !== id) {
-      console.log(`[Lobby] Room changed from ${currentRoomIdRef.current} to ${id}, resetting flag`);
       hasJoinedRoomRef.current = false;
       currentRoomIdRef.current = id;
     }
     
     // If already joined this room, don't do anything
     if (hasJoinedRoomRef.current) {
-      console.log("[Lobby] Already processed this room, skipping entire effect");
       return;
     }
     
-    // Initialize clientId
-    if (!clientIdRef.current) {
-      clientIdRef.current = Math.random().toString(36).substring(2, 15);
-    }
-
-    // Check sessionStorage for existing session
+    // Check sessionStorage for existing session FIRST
     const savedIsHost = sessionStorage.getItem(`room_${id}_isHost`) === "true";
     const savedHostId = sessionStorage.getItem(`room_${id}_hostId`);
     const savedPlayerId = sessionStorage.getItem(`room_${id}_playerId`);
@@ -58,8 +72,6 @@ const LobbyPage = () => {
     
     // If socket already initialized, just rejoin the new room
     if (socketRef.current && socketRef.current.connected) {
-      console.log("[Lobby] Socket already initialized, rejoining room");
-      
       if (savedIsHost && savedHostId) {
         socketRef.current.emit("createRoom", { roomId: id, hostId: savedHostId });
         socketRef.current.emit("joinRoom", { roomId: id, isHost: true, hostId: savedHostId });
@@ -82,41 +94,42 @@ const LobbyPage = () => {
     
     // Prevent multiple socket initializations
     if (socketRef.current) {
-      console.log("[Lobby] Socket initializing, skipping");
       return;
     }
 
-    if (savedIsHost && savedHostId) {
-      clientIdRef.current = savedHostId;
-      setIsHost(true);
-      setHostId(savedHostId);
-      setJoined(true);
-      setIsRejoining(true);
-      console.log("[Lobby] Restoring host session:", savedHostId);
-      
-      // Also save as JSON for room/[id].js
-      sessionStorage.setItem(`room_${id}`, JSON.stringify({
-        isHost: true,
-        hostId: savedHostId,
-        roomId: id
-      }));
-    } else if (savedPlayerId && savedNickname && savedJoined) {
-      clientIdRef.current = savedPlayerId;
-      setPlayerId(savedPlayerId);
-      setNickname(savedNickname);
-      setColor(savedColor || getRandomColor());
-      setJoined(true);
-      setIsRejoining(true);
-      console.log("[Lobby] Restoring player session:", savedPlayerId);
-      
-      // Also save as JSON for room/[id].js
-      sessionStorage.setItem(`room_${id}`, JSON.stringify({
-        isHost: false,
-        playerId: savedPlayerId,
-        nickname: savedNickname,
-        color: savedColor || getRandomColor(),
-        roomId: id
-      }));
+    // ONLY set clientIdRef if not already set
+    if (!clientIdRef.current) {
+      if (savedIsHost && savedHostId) {
+        clientIdRef.current = savedHostId;
+        setIsHost(true);
+        setHostId(savedHostId);
+        setJoined(true);
+        setIsRejoining(true);
+        
+        sessionStorage.setItem(`room_${id}`, JSON.stringify({
+          isHost: true,
+          hostId: savedHostId,
+          roomId: id
+        }));
+      } else if (savedPlayerId && savedNickname && savedJoined) {
+        clientIdRef.current = savedPlayerId;
+        setPlayerId(savedPlayerId);
+        setNickname(savedNickname);
+        setColor(savedColor || getRandomColor());
+        setJoined(true);
+        setIsRejoining(true);
+        
+        sessionStorage.setItem(`room_${id}`, JSON.stringify({
+          isHost: false,
+          playerId: savedPlayerId,
+          nickname: savedNickname,
+          color: savedColor || getRandomColor(),
+          roomId: id
+        }));
+      } else {
+        // Initialize clientId for NEW users (no saved session)
+        clientIdRef.current = Math.random().toString(36).substring(2, 15);
+      }
     }
 
     // Use singleton socket
@@ -127,6 +140,7 @@ const LobbyPage = () => {
       s.off("connect");
       s.off("roomUpdate");
       s.off("playersUpdate");
+      s.off("categoriesUpdate");
       s.off("gameStarted");
       s.off("roomDeleted");
       s.off("leftRoom");
@@ -138,21 +152,18 @@ const LobbyPage = () => {
       const handleRoomJoin = () => {
         // Prevent duplicate joins
         if (hasJoinedRoomRef.current) {
-          console.log("[Lobby] Already joined room, skipping");
           return;
         }
         
         // Auto-create/join for host
         if (savedIsHost && savedHostId) {
-          console.log("[Lobby] Host reconnecting, creating room");
           s.emit("createRoom", { roomId: id, hostId: savedHostId });
           s.emit("joinRoom", { roomId: id, isHost: true, hostId: savedHostId });
-          hasJoinedRoomRef.current = true; // Mark as joined
+          hasJoinedRoomRef.current = true;
           setIsRejoining(false);
         }
         // Auto-rejoin for player
         else if (savedPlayerId && savedNickname && savedJoined) {
-          console.log("[Lobby] Player reconnecting");
           const playerData = {
             id: savedPlayerId,
             name: savedNickname,
@@ -161,46 +172,41 @@ const LobbyPage = () => {
             isHost: false,
           };
           s.emit("joinRoom", { roomId: id, player: playerData });
-          hasJoinedRoomRef.current = true; // Mark as joined
+          hasJoinedRoomRef.current = true;
           setIsRejoining(false);
         }
       };
 
       // Socket event handlers
       s.on("connect", () => {
-        console.log("[Lobby] ✅ Socket connected:", s.id);
-        console.log("[Lobby] Socket.connected:", s.connected);
         handleRoomJoin();
       });
 
       // If socket is already connected, join immediately
       if (s.connected) {
-        console.log("[Lobby] Socket already connected, joining room immediately");
         handleRoomJoin();
       }
 
       s.on("roomUpdate", (data) => {
-        console.log("[Lobby] roomUpdate event - phase:", data.phase);
         if (data.phase && data.phase !== "lobby") {
-          // Redirect to main game page when game starts
-          console.log("[Lobby] Phase changed to", data.phase, "- redirecting to game page");
           router.push(`/room/${id}`);
         }
         setPhase(data.phase || "lobby");
       });
 
       s.on("playersUpdate", (updatedPlayers) => {
-        console.log("[Lobby] Players update:", updatedPlayers);
         setPlayers(updatedPlayers || []);
       });
 
+      s.on("categoriesUpdate", (data) => {
+        setSelectedCategories(data.categories || availableCategories);
+      });
+
       s.on("gameStarted", (data) => {
-        console.log("[Lobby] Game started:", data);
         router.push(`/room/${id}`);
       });
 
       s.on("roomDeleted", (data) => {
-        console.log("[Lobby] Room deleted:", data);
         // Clear session storage
         sessionStorage.removeItem(`room_${id}_isHost`);
         sessionStorage.removeItem(`room_${id}_hostId`);
@@ -208,18 +214,15 @@ const LobbyPage = () => {
         sessionStorage.removeItem(`room_${id}_nickname`);
         sessionStorage.removeItem(`room_${id}_color`);
         sessionStorage.removeItem(`room_${id}_joined`);
-        // Redirect to home page
         router.push("/");
       });
 
       s.on("leftRoom", (data) => {
-        console.log("[Lobby] Left room:", data);
         // Clear session storage
         sessionStorage.removeItem(`room_${id}_playerId`);
         sessionStorage.removeItem(`room_${id}_nickname`);
         sessionStorage.removeItem(`room_${id}_color`);
         sessionStorage.removeItem(`room_${id}_joined`);
-        // Redirect to home page
         router.push("/");
       });
 
@@ -228,7 +231,7 @@ const LobbyPage = () => {
       });
 
       s.on("disconnect", (reason) => {
-        console.log("[Lobby] Socket disconnected:", reason);
+        // Silent disconnect
       });
 
       s.on("connect_error", (error) => {
@@ -248,19 +251,16 @@ const LobbyPage = () => {
     const urlHostId = router.query.hostId || router.query.hostid; // Support both cases
 
     if (urlIsHost && urlHostId && !joined) {
-      console.log("[Lobby] Setting up NEW host from URL");
       clientIdRef.current = urlHostId;
       setIsHost(true);
       setHostId(urlHostId);
       setJoined(true);
-      setIsRejoining(false); // New host doesn't need to show "Reconnecting"
+      setIsRejoining(false);
 
-      // Save both formats for compatibility
       sessionStorage.setItem(`room_${id}_isHost`, "true");
       sessionStorage.setItem(`room_${id}_hostId`, urlHostId);
       sessionStorage.setItem(`room_${id}_joined`, "true");
       
-      // Also save as JSON for room/[id].js
       sessionStorage.setItem(`room_${id}`, JSON.stringify({
         isHost: true,
         hostId: urlHostId,
@@ -283,7 +283,6 @@ const LobbyPage = () => {
 
     const socket = socketRef.current;
     if (!socket) {
-      console.error("[Lobby] Socket not initialized");
       return;
     }
 
@@ -297,8 +296,6 @@ const LobbyPage = () => {
       score: 0,
       isHost: false,
     };
-
-    console.log("[Lobby] Joining room:", { roomId: id, player: playerData });
 
     const emitJoin = () => {
       socket.emit("joinRoom", { roomId: id, player: playerData });
@@ -327,55 +324,45 @@ const LobbyPage = () => {
     }
   };
 
+  // Toggle category selection
+  const toggleCategory = (category) => {
+    setSelectedCategories(prev => {
+      const newCategories = prev.includes(category)
+        ? (prev.length === 1 ? prev : prev.filter(c => c !== category))
+        : [...prev, category];
+      
+      // Emit to server for realtime sync
+      if (socketRef.current && isHost) {
+        socketRef.current.emit("updateCategories", { roomId: id, categories: newCategories });
+      }
+      
+      return newCategories;
+    });
+  };
+
   // Start Game function for host
   const startGame = () => {
-    if (!socketRef.current) {
-      console.error("[Lobby] Cannot start game - socket not initialized");
-      return;
-    }
-    console.log("[Lobby] 🎮 HOST CLICKED START - Emitting startGame event for room:", id);
-    socketRef.current.emit("startGame", { roomId: id });
+    if (!socketRef.current) return;
+    socketRef.current.emit("startGame", { roomId: id, categories: selectedCategories });
   };
 
   // Delete Room function for host
   const handleDeleteRoom = () => {
-    console.log("[Lobby] handleDeleteRoom called");
-    console.log("[Lobby] socketRef.current:", socketRef.current);
-    console.log("[Lobby] isHost:", isHost);
-    console.log("[Lobby] hostId:", hostId);
-    
-    if (!socketRef.current || !isHost || !hostId) {
-      console.error("[Lobby] Cannot delete room - missing requirements");
-      return;
-    }
+    if (!socketRef.current || !isHost || !hostId) return;
     
     const confirmDelete = window.confirm("Are you sure you want to delete this room? All players will be redirected to home page");
-    if (!confirmDelete) {
-      console.log("[Lobby] Delete cancelled by user");
-      return;
-    }
+    if (!confirmDelete) return;
 
-    console.log("[Lobby] Emitting deleteRoom event with:", { roomId: id, hostId: hostId });
     socketRef.current.emit("deleteRoom", { roomId: id, hostId: hostId });
   };
 
   // Leave Room function for players
   const handleLeaveRoom = () => {
-    console.log("[Lobby] handleLeaveRoom called");
-    console.log("[Lobby] playerId:", playerId);
-    
-    if (!socketRef.current || !playerId) {
-      console.error("[Lobby] Cannot leave room - missing requirements");
-      return;
-    }
+    if (!socketRef.current || !playerId) return;
 
     const confirmLeave = window.confirm("Are you sure you want to leave this room?");
-    if (!confirmLeave) {
-      console.log("[Lobby] Leave cancelled by user");
-      return;
-    }
+    if (!confirmLeave) return;
 
-    console.log("[Lobby] Emitting leaveRoom event with:", { roomId: id, playerId: playerId });
     socketRef.current.emit("leaveRoom", { roomId: id, playerId: playerId });
   };
 
@@ -510,7 +497,22 @@ const LobbyPage = () => {
               </div>
 
               <div className="p-8">
-                {/* 2. จำนวน Players และปุ่ม - w-full between */}
+                {/* Selected Categories Display - For All Players */}
+                <div className="w-full mb-6 p-4 rounded-xl bg-yellow-100 border-2 border-yellow-300">
+                  <p className="text-center text-black font-bold mb-2">Categories</p>
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {selectedCategories.map(category => (
+                      <span 
+                        key={category} 
+                        className="px-3 py-1 rounded-full bg-blue-600 text-white text-sm font-semibold capitalize"
+                      >
+                        {category}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Players Count และ ปุ่ม */}
                 <div className="w-full flex items-center justify-between mb-6">
                   {/* ซ้าย: จำนวน Players */}
                   <div className="flex items-center gap-2">
@@ -521,9 +523,50 @@ const LobbyPage = () => {
                     <span className="text-black text-lg">Players</span>
                   </div>
 
-                  {/* ขวา: ปุ่ม Start และ Delete (Host) หรือ Leave (Player) */}
+                  {/* ขวา: Category Dropdown + ปุ่ม Start และ Delete (Host) หรือ Leave (Player) */}
                   {isHost ? (
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 items-center" ref={dropdownRef}>
+                      {/* Category Dropdown (Host Only) */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setDropdownOpen(!dropdownOpen)}
+                          className="rounded-xl border-2 border-yellow-400 bg-white px-4 py-4 text-black font-bold hover:bg-yellow-50 transition shadow-lg flex items-center gap-2"
+                          title="Select Categories"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                          </svg>
+                          <svg className={`w-4 h-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {dropdownOpen && (
+                          <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg border-2 border-yellow-400 shadow-xl z-50">
+                            <div className="p-2">
+                              {availableCategories.map(category => (
+                                <label
+                                  key={category}
+                                  className="flex items-center gap-3 px-3 py-2 hover:bg-yellow-50 rounded-lg cursor-pointer transition"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedCategories.includes(category)}
+                                    onChange={() => toggleCategory(category)}
+                                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+                                  />
+                                  <span className="text-black font-semibold capitalize">
+                                    {category}
+                                  </span>
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       <button
                         type="button"
                         onClick={handleDeleteRoom}

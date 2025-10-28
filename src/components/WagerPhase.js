@@ -6,6 +6,7 @@ const WagerPhase = ({
   chips, 
   myPlayerId, 
   onPlaceBet,
+  onRemoveBet,
   onConfirmWagers,
   currentBets,
   confirmedWagers,
@@ -39,17 +40,29 @@ const WagerPhase = ({
   const hasSelectedTile = !!myZeroChipBet; // Convert to boolean (handles both null and undefined)
 
   const handleBetChange = (tileIndex, value) => {
-    const amount = parseInt(value) || 0;
+    const totalDesired = parseInt(value) || 0;
     
-    if (amount < 0) {
+    if (totalDesired < 0) {
       setError("Amount must be positive");
       return;
     }
     
-    const newBets = { ...pendingBets, [tileIndex]: amount };
-    const newTotal = Object.values(newBets).reduce((sum, amt) => sum + amt, 0);
+    // Get already placed bet on this tile
+    const placedBet = myPlacedBets.find(b => b.tileIndex === tileIndex)?.amount || 0;
     
-    if (newTotal > myChips) {
+    // Calculate how much more we need to bet (can be negative if reducing)
+    const additionalBet = totalDesired - placedBet;
+    
+    // Update pending bets
+    const newBets = { ...pendingBets, [tileIndex]: totalDesired };
+    
+    // Calculate total pending (excluding already placed bets)
+    const totalPending = Object.entries(newBets).reduce((sum, [idx, amt]) => {
+      const alreadyPlaced = myPlacedBets.find(b => b.tileIndex === parseInt(idx))?.amount || 0;
+      return sum + Math.max(0, amt - alreadyPlaced);
+    }, 0);
+    
+    if (totalPending > myChips) {
       setError(`Not enough chips! You have ${myChips} chips`);
       return;
     }
@@ -59,9 +72,21 @@ const WagerPhase = ({
   };
 
   const handlePlaceBets = () => {
-    Object.entries(pendingBets).forEach(([tileIndex, amount]) => {
-      if (amount > 0) {
-        onPlaceBet(parseInt(tileIndex), amount);
+    Object.entries(pendingBets).forEach(([tileIndex, totalAmount]) => {
+      const tileIdx = parseInt(tileIndex);
+      const placedBet = myPlacedBets.find(b => b.tileIndex === tileIdx)?.amount || 0;
+      
+      if (totalAmount === 0 && placedBet > 0) {
+        // User wants to remove the bet
+        onRemoveBet(tileIdx);
+      } else if (totalAmount !== placedBet) {
+        // Need to update bet: remove old and place new
+        if (placedBet > 0) {
+          onRemoveBet(tileIdx);
+        }
+        if (totalAmount > 0) {
+          onPlaceBet(tileIdx, totalAmount);
+        }
       }
     });
     setPendingBets({});
@@ -136,6 +161,9 @@ const WagerPhase = ({
             // Check if this tile is selected by zero-chip player
             const isSelectedByZeroChip = isZeroChipPlayer && myZeroChipBet?.tileIndex === index;
             
+            // Get all bets on this tile (from all players)
+            const allBetsOnTile = currentBets.filter(b => b.tileIndex === index);
+            
             return (
               <article
                 key={index}
@@ -196,14 +224,48 @@ const WagerPhase = ({
                   )}
                 </div>
 
+                {/* Show all bets on this tile (realtime) */}
+                {allBetsOnTile.length > 0 && (
+                  <div className="mb-2 space-y-1">
+                    {allBetsOnTile.map((bet, betIdx) => {
+                      const player = players.find(p => p.id === bet.playerId);
+                      const playerName = player?.name || "Unknown";
+                      const playerColor = player?.color || '#fff';
+                      const isMe = bet.playerId === myPlayerId;
+                      const canRemove = isMe && !hasConfirmed;
+                      return (
+                        <div 
+                          key={betIdx} 
+                          className={`text-xs font-semibold rounded-full px-2 py-1 flex items-center justify-between ${
+                            isMe ? 'bg-white/20' : 'bg-black/30'
+                          } ${canRemove ? 'cursor-pointer hover:bg-white/30' : ''}`}
+                          onClick={canRemove ? (e) => {
+                            e.stopPropagation();
+                            onRemoveBet(index);
+                          } : undefined}
+                          title={canRemove ? 'Click to remove bet' : ''}
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span 
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: playerColor }}
+                            />
+                            <span className="text-white truncate">
+                              {playerName}{isMe && ' (You)'}
+                            </span>
+                          </div>
+                          <span className="ml-2 whitespace-nowrap text-white">
+                            {bet.isZeroChipBet ? '🎁' : `${bet.amount} 🪙`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Bet Input or Selection Button */}
                 {!isHost && !isZeroChipPlayer && (
                   <div>
-                    {placedBet > 0 && (
-                      <div className="mb-2 text-center text-xs text-white font-semibold bg-black/30 rounded-full px-2 py-1">
-                        ✅ Bet: {placedBet} chips
-                      </div>
-                    )}
                     <label htmlFor={`bet-${index}`} className="sr-only">
                       Additional chips to bet
                     </label>
@@ -211,10 +273,10 @@ const WagerPhase = ({
                       id={`bet-${index}`}
                       type="number"
                       min="0"
-                      max={myChips}
-                      value={pendingBet || ""}
+                      max={myChips + placedBet}
+                      value={pendingBets[index] !== undefined ? pendingBets[index] : (placedBet || "")}
                       onChange={(e) => handleBetChange(index, e.target.value)}
-                      placeholder="0"
+                      placeholder={placedBet > 0 ? placedBet.toString() : "0"}
                       className="w-full rounded-lg border-2 border-white/50 bg-white/90 px-3 py-2 text-center text-lg font-bold text-black focus:ring-2 focus:ring-yellow-400 focus:outline-none focus:bg-white"
                     />
                   </div>

@@ -6,7 +6,8 @@ const PayoutPhase = ({
   chips, 
   players,
   currentQuestion,
-  myPlayerId
+  myPlayerId,
+  currentBets
 }) => {
   const getPlayerName = (playerId) => {
     const player = players.find(p => p.id === playerId);
@@ -25,9 +26,9 @@ const PayoutPhase = ({
             const isWinningTile = (tile.isSmallerTile && winningTile.isSmallerTile) || 
                                   (!tile.isSmallerTile && tile.guess === winningTile.guess);
             
-            // Get all bets on this tile
-            const tileBets = tile.bets || [];
-            const totalBetAmount = tileBets.reduce((sum, bet) => sum + (bet.amount || 0), 0);
+            // Get all bets on this tile (from currentBets)
+            const allBetsOnTile = (currentBets || []).filter(b => b.tileIndex === index);
+            const totalBetAmount = allBetsOnTile.reduce((sum, bet) => sum + (bet.amount || 0), 0);
             
             return (
               <article
@@ -87,16 +88,42 @@ const PayoutPhase = ({
                   )}
                 </div>
 
-                {/* Bet Info */}
-                {tileBets.length > 0 && (
-                  <div className="text-center py-2">
-                    <div className={`text-sm font-bold rounded-full px-3 py-1 ${
-                      isWinningTile 
-                        ? 'bg-yellow-600 text-white' 
-                        : 'bg-black/30 text-white'
-                    }`}>
-                      💰 {totalBetAmount} chips bet
-                    </div>
+                {/* Show all bets on this tile (realtime) */}
+                {allBetsOnTile.length > 0 && (
+                  <div className="space-y-1">
+                    {allBetsOnTile.map((bet, betIdx) => {
+                      const player = players.find(p => p.id === bet.playerId);
+                      const playerName = player?.name || "Unknown";
+                      const playerColor = player?.color || '#fff';
+                      const isMe = bet.playerId === myPlayerId;
+                      return (
+                        <div 
+                          key={betIdx} 
+                          className={`text-xs font-semibold rounded-full px-2 py-1 flex items-center justify-between ${
+                            isWinningTile
+                              ? (isMe ? 'bg-yellow-300' : 'bg-yellow-200/80')
+                              : (isMe ? 'bg-white/20' : 'bg-black/30')
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span 
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: playerColor }}
+                            />
+                            <span className={`truncate ${
+                              isWinningTile ? 'text-yellow-900' : 'text-white'
+                            }`}>
+                              {playerName}{isMe && ' (You)'}
+                            </span>
+                          </div>
+                          <span className={`ml-2 whitespace-nowrap ${
+                            isWinningTile ? 'text-yellow-900' : 'text-white'
+                          }`}>
+                            {bet.isZeroChipBet ? '🎁' : `${bet.amount} 🪙`}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </article>

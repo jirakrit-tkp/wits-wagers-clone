@@ -1,78 +1,72 @@
-const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost }) => {
-  // isHost is now passed as a prop - no need to check again
-  
+const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost, hostId }) => {
   if (!isHost) {
-    console.log("⚠️ HostControls: isHost is false, not rendering");
     return null;
   }
-  
-  console.log("✅ HostControls: Rendering for phase:", phase);
-
-  const handleStartGame = () => {
-    socket?.emit("startGame", { roomId });
-  };
 
   const handleNextRound = () => {
     socket?.emit("nextRound", { roomId });
   };
 
-  const handleRevealAnswer = () => {
-    socket?.emit("revealAnswer", { roomId });
-  };
-
-  const handleSetPhase = (newPhase) => {
-    socket?.emit("setPhase", { roomId, phase: newPhase });
+  const handleDeleteRoom = () => {
+    if (window.confirm("Delete this room? All players will be kicked out.")) {
+      socket?.emit("deleteRoom", { roomId, hostId });
+      // Clear session storage
+      sessionStorage.removeItem(`room_${roomId}`);
+      sessionStorage.removeItem(`room_${roomId}_isHost`);
+      sessionStorage.removeItem(`room_${roomId}_hostId`);
+      // Redirect host to landing page immediately
+      window.location.href = "/";
+    }
   };
 
   return (
-    <section className="rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 shadow-xl border-2 border-purple-300 p-6 mb-6">
-      <header className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-3 h-3 rounded-full bg-yellow-300 animate-pulse" />
-          <h2 className="text-white font-bold text-lg">ควบคุมโฮสต์</h2>
-        </div>
-        <div className="text-white/80 text-sm font-medium">
-          รอบ {currentRound} / {totalRounds}
-        </div>
-      </header>
-
-      <div className="space-y-3">
-        {phase === "lobby" && (
-          <button
-            type="button"
-            onClick={handleStartGame}
-            className="w-full rounded-xl bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-4 shadow-lg transition transform hover:scale-105"
-          >
-            🎮 เริ่มเกม
-          </button>
-        )}
-
-        {phase === "question" && (
-          <div className="space-y-2">
-            <button
-              type="button"
-              onClick={handleRevealAnswer}
-              className="w-full rounded-xl bg-blue-500 hover:bg-blue-600 text-white font-semibold px-6 py-3 shadow-lg transition"
-            >
-              📊 เปิดเฉลยคำตอบ
-            </button>
+    <section className="bg-black shadow-xl overflow-hidden">
+      {/* Desktop: Horizontal layout */}
+      <div className="hidden md:flex p-4 items-center justify-between">
+        <h2 className="text-white font-bold text-lg">Host Controls</h2>
+        
+        <div className="flex items-center gap-3">
+          {(phase === "reveal" || phase === "payout") && (
             <button
               type="button"
               onClick={handleNextRound}
-              className="w-full rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 shadow-lg transition"
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 shadow-lg transition"
             >
-              ⏭️ ข้ามไปรอบถัดไป
+              Next Round
             </button>
-          </div>
-        )}
+          )}
 
-        {phase === "reveal" && (
+          {phase === "finished" && (
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 shadow-lg transition"
+            >
+              New Game
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={handleDeleteRoom}
+            className="rounded-xl bg-black hover:bg-red-600 text-white font-semibold px-6 py-3 shadow-lg transition"
+          >
+            Delete Room
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile: Vertical layout */}
+      <div className="md:hidden p-3 space-y-2">
+        <h3 className="text-sm font-bold text-white mb-2">Host Controls</h3>
+        
+        {(phase === "reveal" || phase === "payout") && (
           <button
             type="button"
             onClick={handleNextRound}
-            className="w-full rounded-xl bg-green-500 hover:bg-green-600 text-white font-bold px-6 py-4 shadow-lg transition transform hover:scale-105"
+            className="w-full rounded-md bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm transition"
           >
-            ▶️ รอบถัดไป
+            Next Round
           </button>
         )}
 
@@ -80,49 +74,20 @@ const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost
           <button
             type="button"
             onClick={() => window.location.reload()}
-            className="w-full rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-bold px-6 py-4 shadow-lg transition transform hover:scale-105"
+            className="w-full rounded-md bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm transition"
           >
-            🔄 เริ่มเกมใหม่
+            New Game
           </button>
         )}
-      </div>
 
-      {/* Debug controls - can be removed in production */}
-      <details className="mt-4">
-        <summary className="text-white/60 text-xs cursor-pointer hover:text-white/80 transition">
-          ควบคุมขั้นสูง (Debug)
-        </summary>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => handleSetPhase("lobby")}
-            className="text-xs rounded-lg bg-white/20 hover:bg-white/30 text-white px-3 py-2 transition"
-          >
-            Lobby
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSetPhase("question")}
-            className="text-xs rounded-lg bg-white/20 hover:bg-white/30 text-white px-3 py-2 transition"
-          >
-            Question
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSetPhase("reveal")}
-            className="text-xs rounded-lg bg-white/20 hover:bg-white/30 text-white px-3 py-2 transition"
-          >
-            Reveal
-          </button>
-          <button
-            type="button"
-            onClick={() => handleSetPhase("finished")}
-            className="text-xs rounded-lg bg-white/20 hover:bg-white/30 text-white px-3 py-2 transition"
-          >
-            Finished
-          </button>
-        </div>
-      </details>
+        <button
+          type="button"
+          onClick={handleDeleteRoom}
+          className="w-full rounded-md bg-black hover:bg-red-600 text-white font-semibold px-4 py-2 text-sm transition"
+        >
+          Delete Room
+        </button>
+      </div>
     </section>
   );
 };

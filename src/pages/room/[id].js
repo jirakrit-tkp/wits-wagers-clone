@@ -4,6 +4,7 @@ import { getSocket } from "@/lib/socketManager";
 import QuestionCard from "@/components/QuestionCard";
 import WagerPhase from "@/components/WagerPhase";
 import PayoutPhase from "@/components/PayoutPhase";
+import HostControls from "@/components/HostControls";
 
 export default function RoomPage() {
   const router = useRouter();
@@ -31,6 +32,13 @@ export default function RoomPage() {
   const [chips, setChips] = useState({});
   const [answerTiles, setAnswerTiles] = useState([]);
   const [payoutResult, setPayoutResult] = useState(null);
+  
+  // Debug: Log chips changes (disabled for performance)
+  // useEffect(() => {
+  //   console.log("[Room] 🔍 Chips state changed:", chips);
+  //   console.log("[Room] 🔍 Current clientIdRef:", clientIdRef.current);
+  //   console.log("[Room] 🔍 My chips:", chips[clientIdRef.current]);
+  // }, [chips]);
   const [currentBets, setCurrentBets] = useState([]);
   const [confirmedWagers, setConfirmedWagers] = useState([]);
   const [zeroChipPlayers, setZeroChipPlayers] = useState([]);
@@ -49,68 +57,66 @@ export default function RoomPage() {
   // This page just shows game content when phase !== "lobby"
 
   useEffect(() => {
-    console.log(`[Room] useEffect triggered for room: ${id}, phase: ${phase}`);
     if (!id) return;
     
     // Prevent multiple initializations
     if (socketRef.current) {
-      console.log("[Room] Socket already initialized, skipping");
       return;
     }
     
-    // Initialize clientId if not already set
-    if (!clientIdRef.current) {
-      clientIdRef.current = `${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
-    }
-    
-    // Check if user is host from URL params
-    const urlParams = new URLSearchParams(window.location.search);
-    const isHostParam = urlParams.get("host") === "true";
-    const hostIdParam = urlParams.get("hostId");
-    
-    // Try to restore from sessionStorage (for refresh case)
+    // Try to restore from sessionStorage FIRST (for refresh case and page navigation)
     const storageKey = `room_${id}`;
     const savedData = sessionStorage.getItem(storageKey);
     
-    if (savedData) {
-      try {
-        const parsed = JSON.parse(savedData);
-        console.log("🔄 Restored from sessionStorage:", parsed);
-        
-        if (parsed.isHost) {
-          setIsHost(true);
-          setHostId(parsed.hostId);
-          clientIdRef.current = parsed.hostId; // Use saved hostId
-          setJoined(true);
-          setIsRejoining(true);
-          console.log(`🔑 Host using saved ID: ${parsed.hostId}`);
-        } else if (parsed.playerId && parsed.nickname) {
-          setIsHost(false);
-          clientIdRef.current = parsed.playerId; // Use saved playerId!
-          setNickname(parsed.nickname);
-          setColorKey(parsed.color || "sky-500");
-          setJoined(true);
-          setIsRejoining(true);
-          console.log(`🔑 Player will rejoin with SAVED ID: ${parsed.playerId}`);
+    // ONLY set clientIdRef if it hasn't been set yet
+    if (!clientIdRef.current) {
+      if (savedData) {
+        try {
+          const parsed = JSON.parse(savedData);
+          if (parsed.isHost) {
+            setIsHost(true);
+            setHostId(parsed.hostId);
+            clientIdRef.current = parsed.hostId;
+            setJoined(true);
+            setIsRejoining(true);
+          } else if (parsed.playerId && parsed.nickname) {
+            setIsHost(false);
+            clientIdRef.current = parsed.playerId;
+            setNickname(parsed.nickname);
+            setColorKey(parsed.color || "sky-500");
+            setJoined(true);
+            setIsRejoining(true);
+          }
+        } catch (e) {
+          console.error("Failed to parse saved data:", e);
         }
-      } catch (e) {
-        console.error("Failed to parse saved data:", e);
       }
-    } else if (isHostParam && hostIdParam) {
-      // New host session
-      setIsHost(true);
-      setHostId(hostIdParam);
-      clientIdRef.current = hostIdParam;
       
-      // Save to sessionStorage
-      sessionStorage.setItem(storageKey, JSON.stringify({
-        isHost: true,
-        hostId: hostIdParam,
-        roomId: id
-      }));
-      console.log(`🆕 New host with ID: ${hostIdParam}`);
-    } else {
-      console.log(`🆕 New player with ID: ${clientIdRef.current}`);
+      // Check if user is host from URL params (for NEW host sessions)
+      if (!clientIdRef.current) {
+        const urlParams = new URLSearchParams(window.location.search);
+        const isHostParam = urlParams.get("host") === "true";
+        const hostIdParam = urlParams.get("hostId");
+        
+        if (isHostParam && hostIdParam) {
+          // New host session
+          setIsHost(true);
+          setHostId(hostIdParam);
+          clientIdRef.current = hostIdParam;
+          
+          // Save to sessionStorage
+          sessionStorage.setItem(storageKey, JSON.stringify({
+            isHost: true,
+            hostId: hostIdParam,
+            roomId: id
+          }));
+        }
+      }
+      
+      // Initialize clientId if STILL not set (new player without saved session)
+      if (!clientIdRef.current) {
+        clientIdRef.current = `${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
+      }
     }
     
     // Use singleton socket
@@ -135,7 +141,6 @@ export default function RoomPage() {
       // Set up ALL event listeners FIRST before joining
       // Listen for room updates
       s.on("roomUpdate", (room) => {
-        console.log("[Room] roomUpdate event - phase:", room.phase, "round:", room.currentRound);
         setPhase(room.phase);
         setCurrentQuestion(room.currentQuestion);
         setCurrentRound(room.currentRound);
@@ -144,33 +149,30 @@ export default function RoomPage() {
       
       // Listen for players update
       s.on("playersUpdate", (data) => {
-        console.log("Players updated:", data);
         setPlayers(Array.isArray(data) ? data : []);
-        
-        // Mark rejoining as complete
         setIsRejoining(false);
       });
 
       // Listen for answers update
       s.on("answersUpdate", (data) => {
-        console.log("Answers updated:", data);
         setAnswers(Array.isArray(data) ? data : []);
       });
       
       // Listen for game started
       s.on("gameStarted", (data) => {
-        console.log("Game started:", data);
         setPhase(data.phase);
         setCurrentQuestion(data.question);
         setCurrentRound(data.round);
         setHasSubmitted(false);
         setGuess("");
         setRoundResult(null);
+        if (data.chips) {
+          setChips(data.chips);
+        }
       });
       
       // Listen for next round
       s.on("nextRound", (data) => {
-        console.log("Next round:", data);
         if (data.phase === "finished") {
           setPhase("finished");
         } else {
@@ -185,29 +187,25 @@ export default function RoomPage() {
       
       // Listen for round result (legacy - keep for backwards compatibility)
       s.on("roundResult", (result) => {
-        console.log("Round result:", result);
         setRoundResult(result);
       });
       
       // Listen for chips updates
       s.on("chipsUpdate", (updatedChips) => {
-        console.log("[Room] Chips updated:", updatedChips);
-        setChips(updatedChips);
+        setChips({...updatedChips});
       });
       
       // Listen for answers revealed (transition to wager phase)
       s.on("answersRevealed", (data) => {
-        console.log("[Room] Answers revealed, transitioning to wager phase:", data);
         setAnswerTiles(data.answerTiles || []);
         setPhase(data.phase || 'wager');
         setZeroChipPlayers(data.zeroChipPlayers || []);
-        setConfirmedWagers([]); // 🔴 Reset confirmed wagers when entering new wager phase
-        setCurrentBets([]); // 🔴 Also reset current bets for new round
+        setConfirmedWagers([]);
+        setCurrentBets([]);
       });
       
       // Listen for bets updates
       s.on("betsUpdate", (data) => {
-        console.log("[Room] Bets updated:", data);
         setCurrentBets(data.bets || []);
         if (data.chips) {
           setChips(data.chips);
@@ -216,14 +214,12 @@ export default function RoomPage() {
       
       // Listen for payout results
       s.on("payoutResult", (result) => {
-        console.log("[Room] Payout result:", result);
         setPayoutResult(result);
         setAnswerTiles(result.answerTiles || []);
       });
       
       // Listen for wagers confirmed
       s.on("wagersConfirmed", (data) => {
-        console.log("[Room] Wagers confirmed:", data);
         setConfirmedWagers(data.confirmedWagers || []);
       });
       
@@ -239,19 +235,20 @@ export default function RoomPage() {
         const savedData = sessionStorage.getItem(storageKey);
         const parsed = savedData ? JSON.parse(savedData) : null;
         
+        // Check URL params within the function scope
+        const urlParams = new URLSearchParams(window.location.search);
+        const isHostParam = urlParams.get("host") === "true";
+        const hostIdParam = urlParams.get("hostId");
+        
         // Handle host (new or rejoining)
         if ((isHostParam && hostIdParam) || (parsed && parsed.isHost)) {
           const activeHostId = hostIdParam || parsed.hostId;
           
-          console.log(`[Room] Host creating/joining room ${id} with hostId: ${activeHostId}`);
-          
-          // First create the room (will check if exists)
           s.emit("createRoom", { 
             roomId: id, 
             hostId: activeHostId
           });
           
-          // Then join it
           s.emit("joinRoom", { 
             roomId: id, 
             isHost: true,
@@ -263,7 +260,6 @@ export default function RoomPage() {
         }
         // Handle player rejoining after refresh
         else if (parsed && parsed.playerId && parsed.nickname) {
-          console.log(`[Room] Player rejoining: ${parsed.nickname} with ID: ${parsed.playerId}`);
           s.emit("joinRoom", { 
             roomId: id, 
             player: { 
@@ -279,17 +275,14 @@ export default function RoomPage() {
       
       // Listen for connect events
       s.on("connect", () => {
-        console.log("[Room] Socket connected:", s.id);
         handleRoomJoin();
       });
       
       // If socket is already connected, join immediately
       if (s.connected) {
-        console.log("[Room] Socket already connected, joining room immediately");
         handleRoomJoin();
         
         // Request current room state to ensure we have latest data
-        console.log("[Room] Requesting room state update");
         setTimeout(() => {
           s.emit("requestRoomState", { roomId: id });
         }, 100);
@@ -323,7 +316,6 @@ export default function RoomPage() {
 
     // If socket is already connected, join immediately
     if (socket.connected) {
-      console.log(`🔌 Socket already connected, joining room with ID: ${clientIdRef.current}...`);
       socket.emit("joinRoom", { 
         roomId: id, 
         player: { id: clientIdRef.current, name: nickname.trim(), color: colorKey },
@@ -332,15 +324,13 @@ export default function RoomPage() {
       setJoined(true);
     } else {
       // Wait for connection, then join
-      console.log("⏳ Waiting for socket to connect...");
       socket.once("connect", () => {
-        console.log(`✅ Socket connected, joining room with ID: ${clientIdRef.current}...`);
         socket.emit("joinRoom", { 
           roomId: id, 
           player: { id: clientIdRef.current, name: nickname.trim(), color: colorKey },
           isHost: false
         });
-    setJoined(true);
+        setJoined(true);
       });
     }
   };
@@ -355,7 +345,6 @@ export default function RoomPage() {
 
   const placeBet = (tileIndex, amount) => {
     if (!socketRef.current || !clientIdRef.current) return;
-    console.log(`[Room] Placing bet: ${amount} chips on tile ${tileIndex}`);
     socketRef.current.emit("placeBet", { 
       roomId: id, 
       playerId: clientIdRef.current, 
@@ -364,9 +353,17 @@ export default function RoomPage() {
     });
   };
 
+  const removeBet = (tileIndex) => {
+    if (!socketRef.current || !clientIdRef.current) return;
+    socketRef.current.emit("removeBet", { 
+      roomId: id, 
+      playerId: clientIdRef.current, 
+      tileIndex
+    });
+  };
+
   const confirmWagers = () => {
     if (!socketRef.current || !clientIdRef.current) return;
-    console.log(`[Room] Confirming wagers for player ${clientIdRef.current}`);
     socketRef.current.emit("confirmWagers", {
       roomId: id,
       playerId: clientIdRef.current
@@ -423,7 +420,7 @@ export default function RoomPage() {
                           <div key={i} className="flex items-center justify-between py-2 px-3 rounded bg-white/10">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                               <span className="text-white/60 text-sm font-bold">{i + 1}.</span>
-                              <span className="text-white text-sm font-semibold truncate">
+                              <span className="text-sm font-semibold truncate" style={{ color: p.color }}>
                                 {p.name}
                                 {p.id === clientIdRef.current && " (You)"}
                               </span>
@@ -518,12 +515,24 @@ export default function RoomPage() {
 
                 {/* Mobile Dropdown */}
                 <div id="mobile-sidebar" className="hidden mt-4 space-y-4">
+                  {isHost && (
+                    <HostControls 
+                      roomId={id}
+                      phase={phase}
+                      currentRound={currentRound}
+                      totalRounds={totalRounds}
+                      socket={socketRef.current}
+                      isHost={isHost}
+                      hostId={hostId}
+                    />
+                  )}
+
                   <div>
                     <h3 className="text-sm uppercase tracking-wider text-white/60 mb-2">Scoreboard</h3>
                     <div className="space-y-1">
                       {players.sort((a, b) => (chips[b.id] || 0) - (chips[a.id] || 0)).map((p, i) => (
                         <div key={i} className="flex items-center justify-between py-1.5 text-sm">
-                          <span>{i + 1}. {p.name}</span>
+                          <span><span className="text-white/60">{i + 1}.</span> <span style={{ color: p.color }}>{p.name}</span></span>
                           <span className="text-yellow-400">🪙 {chips[p.id] || 0}</span>
                         </div>
                       ))}
@@ -590,46 +599,19 @@ export default function RoomPage() {
 
             {/* Main Content Area - Right (Green) */}
             <div className="flex-1 flex flex-col bg-green-600 overflow-auto">
-              {/* Host Controls (Simple Inline) */}
+              {/* Host Controls - Desktop Only */}
               {isHost && (
-                <article className="rounded-lg bg-gradient-to-r from-purple-600 to-blue-600 text-white p-4 shadow-lg">
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="text-sm font-semibold">
-                      Host Controls - {getPhaseDisplay()}
-                    </div>
-                    <div className="flex gap-2">
-                      {phase === "question" && (
-                        <button
-                          type="button"
-                          onClick={() => socketRef.current?.emit("revealAnswer", { roomId: id })}
-                          className="rounded-md bg-yellow-500 hover:bg-yellow-600 text-white font-bold px-4 py-2 text-sm transition"
-                          disabled
-                          title="Auto-reveals when all players answer"
-                        >
-                          (Auto Reveal)
-                        </button>
-                      )}
-                      {phase === "wager" && (
-                        <button
-                          type="button"
-                          onClick={() => socketRef.current?.emit("revealAnswer", { roomId: id })}
-                          className="rounded-md bg-yellow-500 hover:bg-yellow-600 text-white font-bold px-4 py-2 text-sm transition"
-                        >
-                          🎯 Reveal Correct Answer
-                        </button>
-                      )}
-                      {(phase === "reveal" || phase === "payout") && (
-                        <button
-                          type="button"
-                          onClick={() => socketRef.current?.emit("nextRound", { roomId: id })}
-                          className="rounded-md bg-green-500 hover:bg-green-600 text-white font-bold px-4 py-2 text-sm transition"
-                        >
-                          ▶️ Next Round
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </article>
+                <div className="hidden md:block">
+                  <HostControls 
+                    roomId={id}
+                    phase={phase}
+                    currentRound={currentRound}
+                    totalRounds={totalRounds}
+                    socket={socketRef.current}
+                    isHost={isHost}
+                    hostId={hostId}
+                  />
+                </div>
               )}
 
               {/* Main Game Area */}
@@ -695,7 +677,7 @@ export default function RoomPage() {
                     {/* 2. Wits & Wagers Placeholder - Middle */}
                     <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-6 shadow-2xl mb-4">
                       <div className="flex items-center justify-center min-h-[120px]">
-                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white/50 text-center tracking-tight" style={{ fontFamily: 'Georgia, serif' }}>
+                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white/50 text-center tracking-tight zoom-pulse" style={{ fontFamily: 'Georgia, serif' }}>
                           Wits &<br />Wagers
                         </h2>
                       </div>
@@ -855,6 +837,7 @@ export default function RoomPage() {
                     chips={chips}
                     myPlayerId={clientIdRef.current}
                     onPlaceBet={placeBet}
+                    onRemoveBet={removeBet}
                     onConfirmWagers={confirmWagers}
                     currentBets={currentBets}
                     confirmedWagers={confirmedWagers}
@@ -884,6 +867,7 @@ export default function RoomPage() {
                       players={players}
                       currentQuestion={currentQuestion}
                       myPlayerId={clientIdRef.current}
+                      currentBets={currentBets}
                     />
 
                     {/* Action Zone with Payout Result */}

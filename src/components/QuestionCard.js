@@ -10,32 +10,24 @@ const QuestionCard = ({ question, round, totalRounds, correctAnswer }) => {
     return colors[category] || "bg-gray-500";
   };
 
-  const getCategoryLabel = (category) => {
-    const labels = {
-      general: "General",
-      entertainment: "Entertainment",
-      dirty: "Fun",
-    };
-    return labels[category] || category;
-  };
-
   return (
     <article className="rounded-xl bg-gradient-to-br from-yellow-100 to-yellow-50 shadow-xl border-2 border-yellow-300 overflow-hidden mb-6">
       <div className="p-6 bg-gradient-to-r from-yellow-200 to-yellow-100">
-        <header className="flex items-center justify-between mb-4">
-          <span className="text-yellow-900 font-semibold text-sm">
-            Question {round} / {totalRounds}
-          </span>
-        </header>
-
         <div>
+          {/* Round indicator - top left, subtle */}
+          {round !== undefined && totalRounds !== undefined && (
+            <p className="text-xs text-yellow-700 text-end">
+              Round {round}/{totalRounds}
+            </p>
+          )}
+          
           <h3 className="text-2xl md:text-3xl font-bold text-yellow-900 leading-relaxed mb-3">
             {question.question}
           </h3>
           
           <div className="flex items-center gap-2">
-            <span className={`inline-flex items-center rounded-full ${getCategoryColor(question.category)} px-3 py-1 text-white text-xs font-semibold`}>
-              {getCategoryLabel(question.category)}
+            <span className={`inline-flex items-center rounded-full ${getCategoryColor(question.category)} px-3 py-1 text-white text-xs font-semibold uppercase`}>
+              {question.category}
             </span>
           </div>
           
