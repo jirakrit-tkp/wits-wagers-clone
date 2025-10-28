@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import io from "socket.io-client";
+import { getSocket } from "@/lib/socketManager";
 import QuestionCard from "@/components/QuestionCard";
 
 export default function RoomPage() {
@@ -35,16 +35,23 @@ export default function RoomPage() {
     "rose-500": "bg-rose-500",
   };
 
-  // Redirect to lobby if phase is lobby
-  useEffect(() => {
-    if (phase === "lobby" && id) {
-      console.log("[Room] Redirecting to lobby");
-      router.push(`/room/${id}/lobby`);
-    }
-  }, [phase, id, router]);
+  // Don't redirect automatically - let user navigate manually
+  // Removed auto-redirect to prevent loop with lobby page
+  // useEffect(() => {
+  //   if (phase === "lobby" && id) {
+  //     console.log("[Room] Redirecting to lobby");
+  //     router.push(`/room/${id}/lobby`);
+  //   }
+  // }, [phase, id]);
 
   useEffect(() => {
     if (!id) return;
+    
+    // Prevent multiple initializations
+    if (socketRef.current) {
+      console.log("[Room] Socket already initialized, skipping");
+      return;
+    }
     
     // Initialize clientId if not already set
     if (!clientIdRef.current) {
@@ -101,14 +108,21 @@ export default function RoomPage() {
       console.log(`🆕 New player with ID: ${clientIdRef.current}`);
     }
     
-    fetch("/api/socketio").finally(() => {
-      const s = io({ path: "/socket.io", transports: ["websocket", "polling"] });
+    // Use singleton socket
+    getSocket().then((s) => {
       socketRef.current = s;
       
-      // Wait for socket to connect before joining
-      s.on("connect", () => {
-        console.log("Socket connected:", s.id);
-        
+      // Remove old listeners first to prevent duplicates
+      s.off("connect");
+      s.off("roomUpdate");
+      s.off("playersUpdate");
+      s.off("answersUpdate");
+      s.off("gameStarted");
+      s.off("nextRound");
+      s.off("roundResult");
+      
+      // Function to handle room creation/joining
+      const handleRoomJoin = () => {
         const storageKey = `room_${id}`;
         const savedData = sessionStorage.getItem(storageKey);
         const parsed = savedData ? JSON.parse(savedData) : null;
@@ -117,6 +131,8 @@ export default function RoomPage() {
         if ((isHostParam && hostIdParam) || (parsed && parsed.isHost)) {
           const activeHostId = hostIdParam || parsed.hostId;
           
+          console.log(`[Room] Host creating/joining room ${id} with hostId: ${activeHostId}`);
+          
           // First create the room (will check if exists)
           s.emit("createRoom", { 
             roomId: id, 
@@ -124,34 +140,40 @@ export default function RoomPage() {
           });
           
           // Then join it
-          setTimeout(() => {
-            s.emit("joinRoom", { 
-              roomId: id, 
-              isHost: true,
-              hostId: activeHostId
-            });
-          }, 100); // Small delay to ensure room is created first
+          s.emit("joinRoom", { 
+            roomId: id, 
+            isHost: true,
+            hostId: activeHostId
+          });
           
           setJoined(true);
         }
         // Handle player rejoining after refresh
         else if (parsed && parsed.playerId && parsed.nickname) {
-          console.log(`🔄 Player rejoining: ${parsed.nickname} with ID: ${parsed.playerId}`);
-          console.log(`📍 clientIdRef.current = ${clientIdRef.current}`);
-          setTimeout(() => {
-            s.emit("joinRoom", { 
-              roomId: id, 
-              player: { 
-                id: parsed.playerId, // Use saved ID from sessionStorage
-                name: parsed.nickname, 
-                color: parsed.color 
-              },
-              isHost: false
-            });
-            console.log(`✉️ Emitted joinRoom with ID: ${parsed.playerId}`);
-          }, 100);
+          console.log(`[Room] Player rejoining: ${parsed.nickname} with ID: ${parsed.playerId}`);
+          s.emit("joinRoom", { 
+            roomId: id, 
+            player: { 
+              id: parsed.playerId,
+              name: parsed.nickname, 
+              color: parsed.color 
+            },
+            isHost: false
+          });
         }
+      };
+      
+      // Listen for connect events
+      s.on("connect", () => {
+        console.log("[Room] Socket connected:", s.id);
+        handleRoomJoin();
       });
+      
+      // If socket is already connected, join immediately
+      if (s.connected) {
+        console.log("[Room] Socket already connected, joining room immediately");
+        handleRoomJoin();
+      }
       
       // Listen for room updates
       s.on("roomUpdate", (room) => {
@@ -210,12 +232,7 @@ export default function RoomPage() {
       });
     });
 
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.removeAllListeners();
-        socketRef.current.disconnect();
-      }
-    };
+    // Don't disconnect on unmount - socket is managed by socketManager singleton
   }, [id]);
 
   const joinRoom = () => {

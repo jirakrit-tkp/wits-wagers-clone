@@ -51,6 +51,14 @@ export default function handler(req, res) {
           return;
         }
 
+        // Check if socket already in this room to prevent duplicate joins
+        const rooms = Array.from(socket.rooms);
+        if (rooms.includes(roomId)) {
+          console.log(`Socket ${socket.id} already in room ${roomId}, ignoring duplicate join`);
+          // Don't send any events to prevent triggering more loops
+          return;
+        }
+
         // Join room first
         socket.join(roomId);
         console.log(`Socket ${socket.id} joined room ${roomId}`);
