@@ -116,8 +116,20 @@ export default function handler(req, res) {
         submitAnswer(roomId, playerId, guess);
         const updatedRoom = getRoom(roomId);
         
-        console.log(`Answer submitted in room ${roomId}. Total answers: ${updatedRoom.answers.length}`);
+        console.log(`Answer submitted in room ${roomId}. Total answers: ${updatedRoom.answers.length}/${updatedRoom.players.length}`);
         io.to(roomId).emit("answersUpdate", updatedRoom.answers);
+        
+        // Auto-reveal when all players have submitted
+        if (updatedRoom.answers.length === updatedRoom.players.length && updatedRoom.players.length > 0) {
+          console.log(`🎯 All players answered! Auto-revealing for room ${roomId}`);
+          
+          if (updatedRoom.currentQuestion) {
+            const result = revealAnswer(roomId, updatedRoom.currentQuestion.answer);
+            console.log(`Answer auto-revealed in room ${roomId}`);
+            io.to(roomId).emit("roundResult", result);
+            io.to(roomId).emit("roomUpdate", updatedRoom);
+          }
+        }
       });
 
       socket.on("placeBet", ({ roomId, playerId, betOn }) => {
@@ -150,21 +162,24 @@ export default function handler(req, res) {
       });
 
       socket.on("startGame", ({ roomId }) => {
+        console.log(`[Server] 🎮 startGame event received for room ${roomId}`);
         const room = getRoom(roomId);
         if (!room) {
-          console.error(`Room ${roomId} not found for startGame`);
+          console.error(`[Server] Room ${roomId} not found for startGame`);
           return;
         }
         
         const result = startGame(roomId);
         if (result) {
           const updatedRoom = getRoom(roomId);
-          console.log(`Game started in room ${roomId}, round ${result.round}`);
-          console.log(`📤 Emitting to room ${roomId}: playersUpdate (${updatedRoom.players.length} players), answersUpdate (${updatedRoom.answers.length} answers)`);
+          console.log(`[Server] ✅ Game started in room ${roomId}, round ${result.round}, phase: ${updatedRoom.phase}`);
+          console.log(`[Server] 📤 Emitting to room ${roomId}: playersUpdate (${updatedRoom.players.length} players), answersUpdate (${updatedRoom.answers.length} answers)`);
           io.to(roomId).emit("gameStarted", result);
           io.to(roomId).emit("roomUpdate", updatedRoom);
           io.to(roomId).emit("playersUpdate", updatedRoom.players); // Send players list!
           io.to(roomId).emit("answersUpdate", updatedRoom.answers); // Send answers list!
+        } else {
+          console.error(`[Server] ❌ Failed to start game in room ${roomId}`);
         }
       });
 

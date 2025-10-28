@@ -180,9 +180,10 @@ const LobbyPage = () => {
       }
 
       s.on("roomUpdate", (data) => {
-        console.log("[Lobby] Room update:", data);
+        console.log("[Lobby] roomUpdate event - phase:", data.phase);
         if (data.phase && data.phase !== "lobby") {
           // Redirect to main game page when game starts
+          console.log("[Lobby] Phase changed to", data.phase, "- redirecting to game page");
           router.push(`/room/${id}`);
         }
         setPhase(data.phase || "lobby");
@@ -328,8 +329,11 @@ const LobbyPage = () => {
 
   // Start Game function for host
   const startGame = () => {
-    if (!socketRef.current) return;
-    console.log("[Lobby] Starting game");
+    if (!socketRef.current) {
+      console.error("[Lobby] Cannot start game - socket not initialized");
+      return;
+    }
+    console.log("[Lobby] 🎮 HOST CLICKED START - Emitting startGame event for room:", id);
     socketRef.current.emit("startGame", { roomId: id });
   };
 
