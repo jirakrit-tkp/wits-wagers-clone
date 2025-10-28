@@ -3,7 +3,7 @@ import questions from './questions.json';
 
 const rooms = {};
 
-const STARTING_CHIPS = 500;
+export const STARTING_CHIPS = 500;
 
 export function createRoom(roomId, hostId) {
   rooms[roomId] = {
@@ -22,6 +22,7 @@ export function createRoom(roomId, hostId) {
     chips: {}, // { playerId: chipCount }
     chipsAtWagerStart: {}, // Snapshot of chips at the START of wager phase
     scores: {}, // Keep for backwards compatibility, but chips are primary now
+    selectedCategories: ['general', 'entertainment', 'dirty'], // Category filters for questions
   };
   return rooms[roomId];
 }
@@ -186,6 +187,34 @@ export function placeBet(roomId, playerId, tileIndex, amount) {
   return { success: true, remainingChips: room.chips[playerId], isZeroChipBet };
 }
 
+// Remove a bet (before confirmation)
+export function removeBet(roomId, playerId, tileIndex) {
+  const room = getRoom(roomId);
+  if (!room) return { success: false, error: 'Room not found' };
+  
+  // Find the bet to remove
+  const betIndex = room.bets.findIndex(b => b.playerId === playerId && b.tileIndex === tileIndex);
+  
+  if (betIndex === -1) {
+    return { success: false, error: 'Bet not found' };
+  }
+  
+  const bet = room.bets[betIndex];
+  
+  // Refund chips (unless it's a zero-chip bet)
+  if (!bet.isZeroChipBet && bet.amount > 0) {
+    room.chips[playerId] = (room.chips[playerId] || 0) + bet.amount;
+    console.log(`[gameState] 💸 Player ${playerId} removed bet of ${bet.amount} chips from tile ${tileIndex} (refunded to: ${room.chips[playerId]})`);
+  } else {
+    console.log(`[gameState] 🗑️ Player ${playerId} removed zero-chip bet from tile ${tileIndex}`);
+  }
+  
+  // Remove bet from array
+  room.bets.splice(betIndex, 1);
+  
+  return { success: true, refundedAmount: bet.amount, remainingChips: room.chips[playerId] };
+}
+
 // Reveal answers and transition to wager phase
 export function revealAnswersAndPrepareWagers(roomId) {
   const room = getRoom(roomId);
@@ -246,7 +275,7 @@ export function confirmWager(roomId, playerId) {
     const hasZeroChipBet = room.bets.some(b => b.playerId === playerId && b.isZeroChipBet);
     if (!hasZeroChipBet) {
       console.log(`[gameState] ❌ Player ${playerId} (zero chips at start) must place a bet before confirming`);
-      return { success: false, error: 'คุณต้องเลือกช่องเดิมพัน 1 ช่องก่อนยืนยัน' };
+      return { success: false, error: 'You must select 1 betting tile before confirming' };
     }
   }
   
@@ -389,14 +418,19 @@ export function revealCorrectAnswerAndPayout(roomId, correctAnswer) {
   };
 }
 
-// Get a random question from a specific category or all categories
-export function getRandomQuestion(category = null) {
+// Get a random question from specific categories or all categories
+export function getRandomQuestion(categories = null) {
   let questionPool = [];
-  let categoryName = null;
   
-  if (category && questions[category]) {
-    questionPool = questions[category];
-    categoryName = category;
+  if (categories && Array.isArray(categories) && categories.length > 0) {
+    // Get questions from selected categories (with their original category)
+    categories.forEach(cat => {
+      if (questions[cat] && Array.isArray(questions[cat])) {
+        questions[cat].forEach(q => {
+          questionPool.push({ ...q, category: cat });
+        });
+      }
+    });
   } else {
     // Get questions from all categories
     Object.entries(questions).forEach(([cat, categoryQuestions]) => {
@@ -413,26 +447,38 @@ export function getRandomQuestion(category = null) {
   const randomIndex = Math.floor(Math.random() * questionPool.length);
   const selectedQuestion = questionPool[randomIndex];
   
-  // Ensure category is set
-  if (!selectedQuestion.category && categoryName) {
-    selectedQuestion.category = categoryName;
-  }
-  
   return selectedQuestion;
 }
 
 // Start the game
-export function startGame(roomId) {
-  console.log(`[gameState] startGame called for room ${roomId}`);
+export function startGame(roomId, categories = null) {
+  console.log(`[gameState] startGame called for room ${roomId}, categories:`, categories);
   const room = getRoom(roomId);
   if (!room) {
     console.error(`[gameState] ❌ Room ${roomId} not found!`);
     return null;
   }
   
+  // Store selected categories in room
+  room.selectedCategories = categories && Array.isArray(categories) && categories.length > 0 
+    ? categories 
+    : ['general', 'entertainment', 'dirty'];
+  
   console.log(`[gameState] Room found with ${room.players.length} players, current phase: ${room.phase}`);
   
-  const question = getRandomQuestion();
+  // Ensure all players have chips at game start
+  console.log(`[gameState] 🔍 Checking chips for ${room.players.length} players...`);
+  room.players.forEach(player => {
+    if (room.chips[player.id] === undefined) {
+      room.chips[player.id] = STARTING_CHIPS;
+      console.log(`[gameState] 💰 Initialized ${STARTING_CHIPS} chips for player ${player.id}`);
+    } else {
+      console.log(`[gameState] ✅ Player ${player.id} already has ${room.chips[player.id]} chips`);
+    }
+  });
+  console.log(`[gameState] 🔍 Final chips before game start:`, room.chips);
+  
+  const question = getRandomQuestion(room.selectedCategories);
   if (!question) {
     console.error(`[gameState] ❌ No question available!`);
     return null;
@@ -486,7 +532,7 @@ export function nextRound(roomId) {
     };
   }
   
-  const question = getRandomQuestion();
+  const question = getRandomQuestion(room.selectedCategories);
   if (!question) return null;
   
   room.phase = 'question';

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ConfirmModal from "./ConfirmModal";
 
 const WagerPhase = ({ 
   answerTiles, 
@@ -6,6 +7,7 @@ const WagerPhase = ({
   chips, 
   myPlayerId, 
   onPlaceBet,
+  onRemoveBet,
   onConfirmWagers,
   currentBets,
   confirmedWagers,
@@ -14,6 +16,8 @@ const WagerPhase = ({
 }) => {
   const [pendingBets, setPendingBets] = useState({}); // { tileIndex: amount } - before confirm
   const [error, setError] = useState("");
+  const [showZeroChipConfirm, setShowZeroChipConfirm] = useState(false);
+  const [pendingTileSelection, setPendingTileSelection] = useState(null);
   
   const myChips = chips[myPlayerId] || 0;
   const totalPendingBet = Object.values(pendingBets).reduce((sum, amount) => sum + amount, 0);
@@ -39,18 +43,30 @@ const WagerPhase = ({
   const hasSelectedTile = !!myZeroChipBet; // Convert to boolean (handles both null and undefined)
 
   const handleBetChange = (tileIndex, value) => {
-    const amount = parseInt(value) || 0;
+    const totalDesired = parseInt(value) || 0;
     
-    if (amount < 0) {
-      setError("จำนวนชิปต้องเป็นบวก");
+    if (totalDesired < 0) {
+      setError("Amount must be positive");
       return;
     }
     
-    const newBets = { ...pendingBets, [tileIndex]: amount };
-    const newTotal = Object.values(newBets).reduce((sum, amt) => sum + amt, 0);
+    // Get already placed bet on this tile
+    const placedBet = myPlacedBets.find(b => b.tileIndex === tileIndex)?.amount || 0;
     
-    if (newTotal > myChips) {
-      setError(`มีชิปไม่พอ! เหลือ ${myChips} ชิป`);
+    // Calculate how much more we need to bet (can be negative if reducing)
+    const additionalBet = totalDesired - placedBet;
+    
+    // Update pending bets
+    const newBets = { ...pendingBets, [tileIndex]: totalDesired };
+    
+    // Calculate total pending (excluding already placed bets)
+    const totalPending = Object.entries(newBets).reduce((sum, [idx, amt]) => {
+      const alreadyPlaced = myPlacedBets.find(b => b.tileIndex === parseInt(idx))?.amount || 0;
+      return sum + Math.max(0, amt - alreadyPlaced);
+    }, 0);
+    
+    if (totalPending > myChips) {
+      setError(`Not enough chips! You have ${myChips} chips`);
       return;
     }
     
@@ -59,9 +75,21 @@ const WagerPhase = ({
   };
 
   const handlePlaceBets = () => {
-    Object.entries(pendingBets).forEach(([tileIndex, amount]) => {
-      if (amount > 0) {
-        onPlaceBet(parseInt(tileIndex), amount);
+    Object.entries(pendingBets).forEach(([tileIndex, totalAmount]) => {
+      const tileIdx = parseInt(tileIndex);
+      const placedBet = myPlacedBets.find(b => b.tileIndex === tileIdx)?.amount || 0;
+      
+      if (totalAmount === 0 && placedBet > 0) {
+        // User wants to remove the bet
+        onRemoveBet(tileIdx);
+      } else if (totalAmount !== placedBet) {
+        // Need to update bet: remove old and place new
+        if (placedBet > 0) {
+          onRemoveBet(tileIdx);
+        }
+        if (totalAmount > 0) {
+          onPlaceBet(tileIdx, totalAmount);
+        }
       }
     });
     setPendingBets({});
@@ -78,29 +106,19 @@ const WagerPhase = ({
 
   const handleZeroChipTileSelect = (tileIndex) => {
     if (!isZeroChipPlayer || hasSelectedTile) return;
-    
-    // Get tile info for confirmation message
-    const tile = answerTiles[tileIndex];
-    const tileName = tile?.isSmallerTile ? 'น้อยกว่าคำตอบทั้งหมด' : tile?.guess;
-    const bonusMessage = allPlayersZeroChip 
-      ? 'ถ้าถูกจะได้ 250 ชิป'
-      : 'ถ้าถูกจะได้ 25% ของรางวัลสูงสุด';
-    
-    // Show confirmation dialog
-    const confirmed = window.confirm(
-      `ยืนยันการเลือกช่อง "${tileName}"?\n\n` +
-      `${bonusMessage}\n` +
-      `(เลือกแล้วจะเปลี่ยนไม่ได้)`
-    );
-    
-    if (!confirmed) {
-      console.log(`[WagerPhase] Zero-chip player cancelled selection`);
-      return;
-    }
+    setPendingTileSelection(tileIndex);
+    setShowZeroChipConfirm(true);
+  };
+
+  const confirmZeroChipSelection = () => {
+    if (pendingTileSelection === null) return;
     
     // Place a zero-chip bet
-    onPlaceBet(tileIndex, 0);
-    console.log(`[WagerPhase] Zero-chip player selected tile ${tileIndex}`);
+    onPlaceBet(pendingTileSelection, 0);
+    console.log(`[WagerPhase] Zero-chip player selected tile ${pendingTileSelection}`);
+    
+    // Reset state
+    setPendingTileSelection(null);
   };
 
   const getPlayerName = (playerId) => {
@@ -111,102 +129,54 @@ const WagerPhase = ({
   if (!answerTiles || answerTiles.length === 0) {
     return (
       <div className="text-center py-8">
-        <p className="text-blue-900">กำลังโหลดตัวเลือกเดิมพัน...</p>
+        <p className="text-blue-900">Loading betting options...</p>
       </div>
     );
   }
 
+  // Get confirmation message data
+  const getConfirmationMessage = () => {
+    if (pendingTileSelection === null) return { title: "", message: "" };
+    const tile = answerTiles[pendingTileSelection];
+    const tileName = tile?.isSmallerTile ? 'Smaller than all' : tile?.guess;
+    const bonusMessage = allPlayersZeroChip 
+      ? 'If correct, you get 250 chips'
+      : 'If correct, you get 25% of max prize';
+    
+    return {
+      title: "Confirm Selection?",
+      message: `Select "${tileName}"?\n\n${bonusMessage}\n\n(Cannot change after selection)`
+    };
+  };
+
+  const confirmData = getConfirmationMessage();
+
   return (
-    <div className="space-y-6">
-      {/* Zero-Chip Player Special Message */}
-      {isZeroChipPlayer && !isHost && (
-        <article className={`rounded-xl p-6 shadow-xl border-2 transition-all ${
-          hasSelectedTile 
-            ? 'bg-gradient-to-r from-green-500 to-green-600 border-green-300' 
-            : 'bg-gradient-to-r from-purple-500 to-pink-500 border-purple-300 animate-pulse'
-        }`}>
-          <div className="text-center">
-            <div className="text-5xl mb-3">{hasSelectedTile ? '✅' : '🎁'}</div>
-            <h3 className="text-white text-2xl font-bold mb-2">
-              {hasSelectedTile ? 'เลือกช่องแล้ว!' : 'โอกาสพิเศษ!'}
-            </h3>
-            {hasSelectedTile && myZeroChipBet ? (
-              <>
-                <p className="text-white mb-2">
-                  คุณเลือกช่อง: <span className="font-bold text-3xl">{myZeroChipBet.tileIndex === 0 ? 'น้อยกว่าทั้งหมด' : answerTiles[myZeroChipBet.tileIndex]?.guess}</span>
-                </p>
-                <p className="text-green-100 text-sm">
-                  {allPlayersZeroChip 
-                    ? '🌟 ถ้าถูกจะได้ 250 ชิป 🌟'
-                    : '🌟 ถ้าถูกจะได้ 25% ของรางวัลสูงสุด 🌟'
-                  }
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-purple-100 mb-3">
-                  คุณหมดชิป แต่ยังมีโอกาสได้รับรางวัล!
-                </p>
-                <p className="text-white font-semibold text-lg mb-2">
-                  🎯 คลิกเลือก 1 ช่อง
-                </p>
-                <p className="text-white text-sm">
-                  {allPlayersZeroChip 
-                    ? '🌟 ถ้าเลือกถูก → ได้ 250 ชิป 🌟'
-                    : '🌟 ถ้าเลือกถูก → ได้ 25% ของรางวัลสูงสุด 🌟'
-                  }
-                </p>
-                <p className="text-purple-100 text-xs mt-2">
-                  (เลือกผิดไม่ได้อะไร แต่ยังเล่นต่อได้)
-                </p>
-              </>
-            )}
+    <>
+      <ConfirmModal
+        isOpen={showZeroChipConfirm}
+        onClose={() => {
+          setShowZeroChipConfirm(false);
+          setPendingTileSelection(null);
+        }}
+        onConfirm={confirmZeroChipSelection}
+        title={confirmData.title}
+        message={confirmData.message}
+        confirmText="Confirm"
+        cancelText="Cancel"
+        isDanger={false}
+      />
+      
+      <div className="space-y-6">
+        {error && (
+          <div className="rounded-lg bg-red-100 border border-red-300 p-3 text-red-700 text-sm">
+            ⚠️ {error}
           </div>
-        </article>
-      )}
+        )}
 
-      {/* Chips Display */}
-      <article className="rounded-xl bg-gradient-to-r from-yellow-400 to-yellow-500 p-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-yellow-900 text-sm font-medium">ชิปตอนนี้</p>
-            <p className="text-3xl font-bold text-white">{myChips} 🪙</p>
-          </div>
-          {totalPlacedBet > 0 && (
-            <div className="text-right">
-              <p className="text-yellow-900 text-sm font-medium">วางแล้ว</p>
-              <p className="text-2xl font-bold text-green-700">{totalPlacedBet} 🪙</p>
-            </div>
-          )}
-          {totalPendingBet > 0 && (
-            <div className="text-right">
-              <p className="text-yellow-900 text-sm font-medium">จะวาง</p>
-              <p className="text-2xl font-bold text-orange-700">{totalPendingBet} 🪙</p>
-            </div>
-          )}
-          <div className="text-right">
-            <p className="text-yellow-900 text-sm font-medium">เหลือหลังวาง</p>
-            <p className={`text-2xl font-bold ${remainingChips < 0 ? 'text-red-600' : 'text-white'}`}>
-              {remainingChips} 🪙
-            </p>
-          </div>
-        </div>
-      </article>
-
-      {error && (
-        <div className="rounded-lg bg-red-100 border border-red-300 p-3 text-red-700 text-sm">
-          ⚠️ {error}
-        </div>
-      )}
-
-      {/* Answer Tiles Grid */}
-      <div>
-        <h3 className="text-blue-900 font-bold text-lg mb-3">🎯 เลือกเดิมพัน</h3>
-        <p className="text-blue-900/60 text-sm mb-4">
-          คลิกตัวเลขแต่ละช่องเพื่อเดิมพัน คูณชิปได้ตามตัวเลข multiplier
-        </p>
-        
-         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* Wager Table - Snooker Style */}
+      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-4 sm:p-6 shadow-2xl">
+        <div className="flex flex-col-reverse md:flex-row gap-3 md:gap-4 items-stretch justify-center">
           {answerTiles.map((tile, index) => {
             const pendingBet = pendingBets[index] || 0;
             const placedBet = myPlacedBets.find(b => b.tileIndex === index)?.amount || 0;
@@ -216,45 +186,38 @@ const WagerPhase = ({
             // Check if this tile is selected by zero-chip player
             const isSelectedByZeroChip = isZeroChipPlayer && myZeroChipBet?.tileIndex === index;
             
+            // Get all bets on this tile (from all players)
+            const allBetsOnTile = currentBets.filter(b => b.tileIndex === index);
+            
             return (
               <article
                 key={index}
-                className={`rounded-xl border-2 p-4 transition-all ${
+                className={`flex-1 min-h-[250px] md:min-h-[300px] lg:min-h-[350px] rounded-2xl border-4 border-white/90 p-3 sm:p-4 transition-all flex flex-col justify-between ${
                   isSelectedByZeroChip
-                    ? 'border-purple-500 bg-purple-50 shadow-xl scale-105 ring-2 ring-purple-300'
+                    ? 'bg-gradient-to-b from-purple-500 to-purple-600 shadow-2xl scale-105 ring-4 ring-purple-300'
                     : placedBet > 0
-                    ? 'border-green-500 bg-green-50 shadow-lg scale-105'
+                    ? 'bg-gradient-to-b from-green-500 to-green-600 shadow-2xl scale-105'
                     : pendingBet > 0
-                    ? 'border-orange-400 bg-orange-50 shadow-md'
+                    ? 'bg-gradient-to-b from-orange-400 to-orange-500 shadow-xl'
                     : isZeroChipPlayer && !hasSelectedTile
-                    ? 'border-purple-300 bg-white hover:border-purple-500 hover:shadow-lg cursor-pointer'
-                    : 'border-blue-200 bg-white hover:border-blue-400 hover:shadow-md'
+                    ? 'bg-gradient-to-b from-green-600 to-green-700 hover:from-purple-600 hover:to-purple-700 hover:shadow-2xl cursor-pointer'
+                    : 'bg-gradient-to-b from-green-600 to-green-700 hover:shadow-xl'
                 }`}
                 onClick={() => isZeroChipPlayer && !hasSelectedTile && handleZeroChipTileSelect(index)}
               >
-                {/* Multiplier Badge */}
+                {/* Multiplier Badge - Top */}
                 <div className="flex justify-between items-start mb-2">
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
-                    tile.multiplier >= 5 ? 'bg-purple-500 text-white' :
-                    tile.multiplier >= 4 ? 'bg-red-500 text-white' :
-                    tile.multiplier >= 3 ? 'bg-orange-500 text-white' :
-                    'bg-blue-500 text-white'
-                  }`}>
+                  <span className="inline-block px-3 py-1 rounded-full text-sm sm:text-base font-black bg-white/90 text-black shadow-lg">
                     ×{tile.multiplier}
                   </span>
                   <div className="text-right">
                     {isSelectedByZeroChip && (
-                      <span className="block text-purple-600 text-xs font-semibold">
-                        🎁 เลือกแล้ว
-                      </span>
-                    )}
-                    {placedBet > 0 && !isSelectedByZeroChip && (
-                      <span className="block text-green-600 text-xs font-semibold">
-                        ✅ วางแล้ว {placedBet} 🪙
+                      <span className="block text-white text-xs font-bold bg-purple-500/80 rounded-full px-2 py-1">
+                        🎁 Selected
                       </span>
                     )}
                     {totalBetOnTile > 0 && !isSelectedByZeroChip && (
-                      <span className="block text-blue-600 text-xs font-semibold">
+                      <span className="block text-white text-xs font-bold bg-black/40 rounded-full px-2 py-1">
                         → {potentialWin} 🪙
                       </span>
                     )}
@@ -262,23 +225,23 @@ const WagerPhase = ({
                 </div>
 
                 {/* Answer Display */}
-                <div className="mb-3">
+                <div className="mb-3 flex-1 flex flex-col items-center justify-center">
                   {tile.isSmallerTile ? (
                     <div className="text-center">
-                      <p className="text-lg font-bold text-purple-700">
-                        น้อยกว่าทั้งหมด
+                      <p className="text-xl sm:text-2xl font-bold text-white">
+                        SMALLER
                       </p>
-                      <p className="text-xs text-purple-600">
-                        Smaller than smallest
+                      <p className="text-sm text-white/80 mt-2">
+                        Than all guesses
                       </p>
                     </div>
                   ) : (
                     <>
-                      <p className="text-3xl font-bold text-blue-900 text-center mb-1">
+                      <p className="text-4xl sm:text-5xl lg:text-6xl font-black text-white text-center mb-2">
                         {tile.guess}
                       </p>
                       {tile.playerIds && tile.playerIds.length > 0 && (
-                        <div className="text-xs text-blue-600 text-center">
+                        <div className="text-xs text-white/70 text-center mt-1">
                           {tile.playerIds.map(pid => getPlayerName(pid)).join(", ")}
                         </div>
                       )}
@@ -286,26 +249,60 @@ const WagerPhase = ({
                   )}
                 </div>
 
+                {/* Show all bets on this tile (realtime) */}
+                {allBetsOnTile.length > 0 && (
+                  <div className="mb-2 space-y-1">
+                    {allBetsOnTile.map((bet, betIdx) => {
+                      const player = players.find(p => p.id === bet.playerId);
+                      const playerName = player?.name || "Unknown";
+                      const playerColor = player?.color || '#fff';
+                      const isMe = bet.playerId === myPlayerId;
+                      const canRemove = isMe && !hasConfirmed;
+                      return (
+                        <div 
+                          key={betIdx} 
+                          className={`text-xs font-semibold rounded-full px-2 py-1 flex items-center justify-between ${
+                            isMe ? 'bg-white/20' : 'bg-black/30'
+                          } ${canRemove ? 'cursor-pointer hover:bg-white/30' : ''}`}
+                          onClick={canRemove ? (e) => {
+                            e.stopPropagation();
+                            onRemoveBet(index);
+                          } : undefined}
+                          title={canRemove ? 'Click to remove bet' : ''}
+                        >
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span 
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: playerColor }}
+                            />
+                            <span className="text-white truncate">
+                              {playerName}{isMe && ' (You)'}
+                            </span>
+                          </div>
+                          <span className="ml-2 whitespace-nowrap text-white">
+                            {bet.isZeroChipBet ? '🎁' : `${bet.amount} 🪙`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {/* Bet Input or Selection Button */}
                 {!isHost && !isZeroChipPlayer && (
                   <div>
-                    {placedBet > 0 && (
-                      <div className="mb-2 text-center text-xs text-green-700 font-semibold">
-                        เดิมพันช่องนี้แล้ว {placedBet} ชิป
-                      </div>
-                    )}
                     <label htmlFor={`bet-${index}`} className="sr-only">
-                      จำนวนชิปที่จะเดิมพันเพิ่ม
+                      Additional chips to bet
                     </label>
                     <input
                       id={`bet-${index}`}
                       type="number"
                       min="0"
-                      max={myChips}
-                      value={pendingBet || ""}
+                      max={myChips + placedBet}
+                      value={pendingBets[index] !== undefined ? pendingBets[index] : (placedBet || "")}
                       onChange={(e) => handleBetChange(index, e.target.value)}
-                      placeholder="0"
-                      className="w-full rounded-lg border border-blue-300 px-3 py-2 text-center text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder={placedBet > 0 ? placedBet.toString() : "0"}
+                      className="w-full rounded-lg border-2 border-white/50 bg-white/90 px-3 py-2 text-center text-lg font-bold text-black focus:ring-2 focus:ring-yellow-400 focus:outline-none focus:bg-white"
                     />
                   </div>
                 )}
@@ -313,16 +310,16 @@ const WagerPhase = ({
                 {/* Zero-Chip Player: Click to select */}
                 {!isHost && isZeroChipPlayer && !hasSelectedTile && (
                   <div className="text-center py-2">
-                    <div className="text-purple-600 text-sm font-semibold">
-                      👆 คลิกเพื่อเลือก
+                    <div className="text-white text-sm font-bold bg-purple-500/80 rounded-full px-3 py-1">
+                      👆 Click to select
                     </div>
                   </div>
                 )}
                 
                 {!isHost && isSelectedByZeroChip && (
                   <div className="text-center py-2">
-                    <div className="text-purple-600 text-sm font-bold">
-                      ✅ คุณเลือกช่องนี้
+                    <div className="text-white text-sm font-bold">
+                      ✅ You selected this tile
                     </div>
                   </div>
                 )}
@@ -332,87 +329,146 @@ const WagerPhase = ({
         </div>
       </div>
 
-      {/* Confirmation Status */}
-      <article className="rounded-xl bg-blue-50 border border-blue-200 p-4">
-        <h3 className="text-blue-900 font-bold text-sm mb-3">📊 สถานะการยืนยัน</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-          {players.map((player) => {
-            const confirmed = confirmedWagers?.includes(player.id) || false;
-            return (
-              <div
-                key={player.id}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold text-center ${
-                  confirmed
-                    ? 'bg-green-100 text-green-700 border border-green-300'
-                    : 'bg-gray-100 text-gray-500 border border-gray-300'
-                }`}
-              >
-                <div>{player.name}</div>
-                <div className="mt-1">{confirmed ? '✅' : '⏳'}</div>
+      {/* Action Zone (Yellow Theme) */}
+      <div className="rounded-xl bg-gradient-to-br from-yellow-100 to-yellow-50 border-2 border-yellow-300 shadow-xl overflow-hidden mt-4">
+        <div className="p-6 bg-gradient-to-r from-yellow-200 to-yellow-100 space-y-4">
+          {!isHost && (
+            <>
+              {/* Special Chance Info (for zero-chip players) */}
+            {isZeroChipPlayer && !hasConfirmed && (
+              <div className="text-center py-3 border-t border-b border-purple-300">
+                <h4 className="text-purple-900 font-bold text-sm mb-2">
+                  {hasSelectedTile ? 'Tile Selected' : 'Special Chance'}
+                </h4>
+                {hasSelectedTile && myZeroChipBet ? (
+                  <div className="space-y-1">
+                    <p className="text-purple-800 font-semibold text-sm">
+                      You selected: <span className="font-black">{myZeroChipBet.tileIndex === 0 ? 'Smaller than all' : answerTiles[myZeroChipBet.tileIndex]?.guess}</span>
+                    </p>
+                    <p className="text-purple-700 text-xs">
+                      {allPlayersZeroChip 
+                        ? 'If correct → Get 250 chips'
+                        : 'If correct → Get 25% of max prize'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-purple-800 text-sm">
+                      Out of chips? Click a tile above
+                    </p>
+                    <p className="text-purple-700 text-xs">
+                      {allPlayersZeroChip 
+                        ? 'If correct → Get 250 chips'
+                        : 'If correct → Get 25% of max prize'
+                      }
+                    </p>
+                  </div>
+                )}
               </div>
-            );
-          })}
-        </div>
-        <div className="mt-3 text-center text-sm font-semibold text-blue-700">
-          {confirmedCount}/{totalPlayers} ยืนยันแล้ว
-        </div>
-      </article>
+            )}
 
-      {/* Action Buttons */}
-      {!isHost && (
-        <>
-          {/* Place Pending Bets Button (for normal players) */}
-          {!isZeroChipPlayer && totalPendingBet > 0 && !hasConfirmed && remainingChips >= 0 && (
-            <button
-              type="button"
-              onClick={handlePlaceBets}
-              className="w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold px-6 py-4 shadow-lg transition transform hover:scale-105"
-            >
-              📍 วางเดิมพัน ({totalPendingBet} ชิป)
-            </button>
-          )}
+            {/* Chips Info Display (for non-zero-chip players) */}
+            {!isZeroChipPlayer && !hasConfirmed && (
+              <div className="flex items-center justify-center gap-15 text-center">
+                {/* Current Chips */}
+                <div>
+                  <p className="text-blue-600 text-sm font-semibold mb-1">💰 Current</p>
+                  <p className="text-blue-900 text-3xl font-black">{myChips}</p>
+                </div>
+                
+                {/* Pending Bets */}
+                <div>
+                  <p className="text-orange-600 text-sm font-semibold mb-1">⏳ Pending</p>
+                  <p className="text-orange-900 text-3xl font-black">{totalPendingBet}</p>
+                </div>
+                
+                {/* Remaining */}
+                <div>
+                  <p className={`text-sm font-semibold mb-1 ${
+                    remainingChips < 0 ? 'text-red-600' : 'text-purple-600'
+                  }`}>
+                    {remainingChips < 0 ? '⚠️ Over!' : '🎯 Remaining'}
+                  </p>
+                  <p className={`text-3xl font-black ${
+                    remainingChips < 0 ? 'text-red-900' : 'text-purple-900'
+                  }`}>
+                    {remainingChips}
+                  </p>
+                </div>
+              </div>
+            )}
 
-          {/* Confirm Wagers Button */}
-          {!hasConfirmed ? (
-            isZeroChipPlayer && !hasSelectedTile ? (
+            {/* Header (for non-zero-chip players only) */}
+            {!hasConfirmed && !isZeroChipPlayer && (
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-yellow-900 mb-1">
+                  🎲 Place Your Bets
+                </h3>
+                <p className="text-yellow-700 text-sm">
+                  Enter bet amounts in the tiles above, then place your bets!
+                </p>
+              </div>
+            )}
+
+            {/* Place Pending Bets Button (for normal players) */}
+            {!isZeroChipPlayer && totalPendingBet > 0 && !hasConfirmed && remainingChips >= 0 && (
               <button
                 type="button"
-                disabled
-                className="w-full rounded-xl bg-gray-400 text-white font-bold px-6 py-4 shadow-lg cursor-not-allowed opacity-50"
+                onClick={handlePlaceBets}
+                className="w-full rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-base px-6 py-3 shadow-md transition"
               >
-                ⚠️ เลือกช่องก่อนยืนยัน
+                Place Bets ({totalPendingBet} chips)
               </button>
+            )}
+
+            {/* Confirm Wagers Button */}
+            {!hasConfirmed ? (
+              isZeroChipPlayer && !hasSelectedTile ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full rounded-xl bg-gray-400 text-white font-bold text-base px-6 py-3 shadow-md cursor-not-allowed opacity-60"
+                >
+                  Select a tile first
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConfirmWagers}
+                  className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base px-6 py-3 shadow-md transition"
+                >
+                  {totalPlacedBet > 0 && !isZeroChipPlayer 
+                    ? `Confirm Wagers (${totalPlacedBet} chips)` 
+                    : 'Confirm Wagers'
+                  }
+                </button>
+              )
             ) : (
-              <button
-                type="button"
-                onClick={handleConfirmWagers}
-                className="w-full rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-4 shadow-lg transition transform hover:scale-105"
-              >
-                ✅ ยืนยันการเดิมพัน
-                {isZeroChipPlayer 
-                  ? ' (เลือกช่องแล้ว)' 
-                  : totalPlacedBet > 0 
-                  ? ` (วางไปแล้ว ${totalPlacedBet} ชิป)` 
-                  : ''}
-              </button>
-            )
-          ) : (
-            <div className="w-full rounded-xl bg-green-100 border-2 border-green-500 text-green-700 font-bold px-6 py-4 text-center">
-              ✅ คุณยืนยันแล้ว - รอผู้เล่นคนอื่น ({confirmedCount}/{totalPlayers})
+              <div className="text-center py-3">
+                <h3 className="text-yellow-900 text-base font-bold mb-2">Confirmed</h3>
+                <p className="text-yellow-700 text-sm">
+                  Waiting for others... ({confirmedCount}/{totalPlayers})
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+          {/* Host Message */}
+          {isHost && (
+            <div className="text-center py-3">
+              <h3 className="text-yellow-900 text-base font-bold mb-2">Host View</h3>
+              <p className="text-yellow-700 text-sm mb-2">Waiting for players to confirm wagers...</p>
+              <p className="text-yellow-900 font-bold text-sm">
+                {confirmedCount}/{totalPlayers} confirmed
+              </p>
             </div>
           )}
-        </>
-      )}
-
-      {/* Host Message */}
-      {isHost && (
-        <div className="text-center py-4 bg-purple-100 rounded-xl border border-purple-300">
-          <p className="text-purple-900 font-semibold">
-            👑 คุณคือ Host - รอผู้เล่นยืนยันการเดิมพัน ({confirmedCount}/{totalPlayers})
-          </p>
         </div>
-      )}
+      </div>
     </div>
+    </>
   );
 };
 

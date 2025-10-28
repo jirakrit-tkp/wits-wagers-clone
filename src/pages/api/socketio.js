@@ -3,9 +3,11 @@ import { Server } from "socket.io";
 import {
   createRoom,
   addPlayer,
+  STARTING_CHIPS,
   removePlayer,
   submitAnswer,
   placeBet,
+  removeBet,
   confirmWager,
   revealAnswersAndPrepareWagers,
   revealCorrectAnswerAndPayout,
@@ -77,6 +79,8 @@ export default function handler(req, res) {
           
           // Send current players list to the host
           socket.emit("playersUpdate", room.players);
+          socket.emit("chipsUpdate", room.chips); // Send chips to host too
+          socket.emit("categoriesUpdate", { categories: room.selectedCategories || [] }); // Send categories
           return;
         }
 
@@ -91,6 +95,11 @@ export default function handler(req, res) {
           if (existingPlayerIndex >= 0) {
             // Player exists, update their info (don't add duplicate)
             room.players[existingPlayerIndex] = player;
+            // Ensure player has chips (in case they joined before game started)
+            if (room.chips[player.id] === undefined) {
+              room.chips[player.id] = STARTING_CHIPS;
+              console.log(`💰 Initialized ${STARTING_CHIPS} chips for rejoining player ${player.id}`);
+            }
             console.log(`✅ Player ${player.name} (${player.id}) REJOINED room ${roomId} - NO DUPLICATE ADDED`);
           } else {
             // New player, add them
@@ -101,9 +110,13 @@ export default function handler(req, res) {
           const updatedRoom = getRoom(roomId);
           
           // IMPORTANT: Always broadcast to EVERYONE first (including this socket)
+          console.log(`[Server] 💰 Chips after player join:`, updatedRoom.chips);
           io.to(roomId).emit("playersUpdate", updatedRoom.players);
           io.to(roomId).emit("roomUpdate", updatedRoom);
           io.to(roomId).emit("answersUpdate", updatedRoom.answers);
+          console.log(`[Server] 📤 Emitting chipsUpdate after join:`, updatedRoom.chips);
+          io.to(roomId).emit("chipsUpdate", updatedRoom.chips); // Send initial chips when player joins!
+          io.to(roomId).emit("categoriesUpdate", { categories: updatedRoom.selectedCategories || [] }); // Send categories
         }
       });
 
@@ -156,6 +169,29 @@ export default function handler(req, res) {
           });
         } else {
           console.log(`❌ Bet failed: ${result.error}`);
+          socket.emit("betError", { error: result.error });
+        }
+      });
+
+      socket.on("removeBet", ({ roomId, playerId, tileIndex }) => {
+        const room = getRoom(roomId);
+        if (!room) {
+          console.error(`Room ${roomId} not found for removeBet`);
+          socket.emit("error", { message: "Room not found" });
+          return;
+        }
+        
+        const result = removeBet(roomId, playerId, tileIndex);
+        
+        if (result.success) {
+          console.log(`✅ Bet removed in room ${roomId}: ${playerId} removed bet from tile ${tileIndex} (refunded: ${result.refundedAmount})`);
+          const updatedRoom = getRoom(roomId);
+          io.to(roomId).emit("betsUpdate", { 
+            bets: updatedRoom.bets,
+            chips: updatedRoom.chips 
+          });
+        } else {
+          console.log(`❌ Remove bet failed: ${result.error}`);
           socket.emit("betError", { error: result.error });
         }
       });
@@ -226,23 +262,42 @@ export default function handler(req, res) {
         }
       });
 
-      socket.on("startGame", ({ roomId }) => {
-        console.log(`[Server] 🎮 startGame event received for room ${roomId}`);
+      socket.on("updateCategories", ({ roomId, categories }) => {
+        console.log(`[Server] 📝 updateCategories event received for room ${roomId}, categories:`, categories);
+        const room = getRoom(roomId);
+        if (!room) {
+          console.error(`[Server] Room ${roomId} not found for updateCategories`);
+          return;
+        }
+        
+        // Update room categories
+        room.selectedCategories = categories;
+        console.log(`[Server] ✅ Categories updated for room ${roomId}:`, categories);
+        
+        // Broadcast to all clients in the room
+        io.to(roomId).emit("categoriesUpdate", { categories });
+      });
+
+      socket.on("startGame", ({ roomId, categories }) => {
+        console.log(`[Server] 🎮 startGame event received for room ${roomId}, categories:`, categories);
         const room = getRoom(roomId);
         if (!room) {
           console.error(`[Server] Room ${roomId} not found for startGame`);
           return;
         }
         
-        const result = startGame(roomId);
+        const result = startGame(roomId, categories);
         if (result) {
           const updatedRoom = getRoom(roomId);
           console.log(`[Server] ✅ Game started in room ${roomId}, round ${result.round}, phase: ${updatedRoom.phase}`);
+          console.log(`[Server] 💰 Result chips:`, result.chips);
           console.log(`[Server] 📤 Emitting to room ${roomId}: playersUpdate (${updatedRoom.players.length} players), chips:`, updatedRoom.chips);
+          console.log(`[Server] 📤 Emitting gameStarted with:`, result);
           io.to(roomId).emit("gameStarted", result);
           io.to(roomId).emit("roomUpdate", updatedRoom);
           io.to(roomId).emit("playersUpdate", updatedRoom.players);
           io.to(roomId).emit("answersUpdate", updatedRoom.answers);
+          console.log(`[Server] 📤 Emitting chipsUpdate:`, updatedRoom.chips);
           io.to(roomId).emit("chipsUpdate", updatedRoom.chips); // Send initial chips!
         } else {
           console.error(`[Server] ❌ Failed to start game in room ${roomId}`);
@@ -355,6 +410,8 @@ export default function handler(req, res) {
         socket.emit("roomUpdate", room);
         socket.emit("playersUpdate", room.players);
         socket.emit("answersUpdate", room.answers);
+        socket.emit("chipsUpdate", room.chips); // ✅ ส่ง chips ด้วย!
+        console.log(`[Socket] 💰 Sent chips:`, room.chips);
         console.log(`[Socket] Sent room state to socket ${socket.id}: ${room.players.length} players, ${room.answers.length} answers`);
       });
 
