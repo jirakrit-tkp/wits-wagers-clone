@@ -121,60 +121,7 @@ export default function RoomPage() {
       s.off("nextRound");
       s.off("roundResult");
       
-      // Function to handle room creation/joining
-      const handleRoomJoin = () => {
-        const storageKey = `room_${id}`;
-        const savedData = sessionStorage.getItem(storageKey);
-        const parsed = savedData ? JSON.parse(savedData) : null;
-        
-        // Handle host (new or rejoining)
-        if ((isHostParam && hostIdParam) || (parsed && parsed.isHost)) {
-          const activeHostId = hostIdParam || parsed.hostId;
-          
-          console.log(`[Room] Host creating/joining room ${id} with hostId: ${activeHostId}`);
-          
-          // First create the room (will check if exists)
-          s.emit("createRoom", { 
-            roomId: id, 
-            hostId: activeHostId
-          });
-          
-          // Then join it
-          s.emit("joinRoom", { 
-            roomId: id, 
-            isHost: true,
-            hostId: activeHostId
-          });
-          
-          setJoined(true);
-        }
-        // Handle player rejoining after refresh
-        else if (parsed && parsed.playerId && parsed.nickname) {
-          console.log(`[Room] Player rejoining: ${parsed.nickname} with ID: ${parsed.playerId}`);
-          s.emit("joinRoom", { 
-            roomId: id, 
-            player: { 
-              id: parsed.playerId,
-              name: parsed.nickname, 
-              color: parsed.color 
-            },
-            isHost: false
-          });
-        }
-      };
-      
-      // Listen for connect events
-      s.on("connect", () => {
-        console.log("[Room] Socket connected:", s.id);
-        handleRoomJoin();
-      });
-      
-      // If socket is already connected, join immediately
-      if (s.connected) {
-        console.log("[Room] Socket already connected, joining room immediately");
-        handleRoomJoin();
-      }
-      
+      // Set up ALL event listeners FIRST before joining
       // Listen for room updates
       s.on("roomUpdate", (room) => {
         console.log("Room updated:", room);
@@ -230,6 +177,68 @@ export default function RoomPage() {
         console.log("Round result:", result);
         setRoundResult(result);
       });
+      
+      // NOW define the join function AFTER all listeners are set
+      const handleRoomJoin = () => {
+        const storageKey = `room_${id}`;
+        const savedData = sessionStorage.getItem(storageKey);
+        const parsed = savedData ? JSON.parse(savedData) : null;
+        
+        // Handle host (new or rejoining)
+        if ((isHostParam && hostIdParam) || (parsed && parsed.isHost)) {
+          const activeHostId = hostIdParam || parsed.hostId;
+          
+          console.log(`[Room] Host creating/joining room ${id} with hostId: ${activeHostId}`);
+          
+          // First create the room (will check if exists)
+          s.emit("createRoom", { 
+            roomId: id, 
+            hostId: activeHostId
+          });
+          
+          // Then join it
+          s.emit("joinRoom", { 
+            roomId: id, 
+            isHost: true,
+            hostId: activeHostId
+          });
+          
+          setJoined(true);
+          setIsRejoining(false);
+        }
+        // Handle player rejoining after refresh
+        else if (parsed && parsed.playerId && parsed.nickname) {
+          console.log(`[Room] Player rejoining: ${parsed.nickname} with ID: ${parsed.playerId}`);
+          s.emit("joinRoom", { 
+            roomId: id, 
+            player: { 
+              id: parsed.playerId,
+              name: parsed.nickname, 
+              color: parsed.color 
+            },
+            isHost: false
+          });
+          setIsRejoining(false);
+        }
+      };
+      
+      // Listen for connect events
+      s.on("connect", () => {
+        console.log("[Room] Socket connected:", s.id);
+        handleRoomJoin();
+      });
+      
+      // If socket is already connected, join immediately
+      if (s.connected) {
+        console.log("[Room] Socket already connected, joining room immediately");
+        handleRoomJoin();
+        
+        // Request current room state to ensure we have latest data
+        console.log("[Room] Requesting room state update");
+        setTimeout(() => {
+          s.emit("requestRoomState", { roomId: id });
+        }, 100);
+      }
     });
 
     // Don't disconnect on unmount - socket is managed by socketManager singleton
