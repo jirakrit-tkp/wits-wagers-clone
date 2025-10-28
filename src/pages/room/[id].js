@@ -1,6 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
-import io from "socket.io-client";
+import { getSocket } from "@/lib/socketManager";
 import QuestionCard from "@/components/QuestionCard";
 
 export default function RoomPage() {
@@ -35,16 +35,18 @@ export default function RoomPage() {
     "rose-500": "bg-rose-500",
   };
 
-  // Redirect to lobby if phase is lobby
-  useEffect(() => {
-    if (phase === "lobby" && id) {
-      console.log("[Room] Redirecting to lobby");
-      router.push(`/room/${id}/lobby`);
-    }
-  }, [phase, id, router]);
+  // No auto-redirect needed - lobby.js handles redirect to game page when started
+  // This page just shows game content when phase !== "lobby"
 
   useEffect(() => {
+    console.log(`[Room] useEffect triggered for room: ${id}, phase: ${phase}`);
     if (!id) return;
+    
+    // Prevent multiple initializations
+    if (socketRef.current) {
+      console.log("[Room] Socket already initialized, skipping");
+      return;
+    }
     
     // Initialize clientId if not already set
     if (!clientIdRef.current) {
@@ -101,61 +103,23 @@ export default function RoomPage() {
       console.log(`🆕 New player with ID: ${clientIdRef.current}`);
     }
     
-    fetch("/api/socketio").finally(() => {
-      const s = io({ path: "/socket.io", transports: ["websocket", "polling"] });
+    // Use singleton socket
+    getSocket().then((s) => {
       socketRef.current = s;
       
-      // Wait for socket to connect before joining
-      s.on("connect", () => {
-        console.log("Socket connected:", s.id);
-        
-        const storageKey = `room_${id}`;
-        const savedData = sessionStorage.getItem(storageKey);
-        const parsed = savedData ? JSON.parse(savedData) : null;
-        
-        // Handle host (new or rejoining)
-        if ((isHostParam && hostIdParam) || (parsed && parsed.isHost)) {
-          const activeHostId = hostIdParam || parsed.hostId;
-          
-          // First create the room (will check if exists)
-          s.emit("createRoom", { 
-            roomId: id, 
-            hostId: activeHostId
-          });
-          
-          // Then join it
-          setTimeout(() => {
-            s.emit("joinRoom", { 
-              roomId: id, 
-              isHost: true,
-              hostId: activeHostId
-            });
-          }, 100); // Small delay to ensure room is created first
-          
-          setJoined(true);
-        }
-        // Handle player rejoining after refresh
-        else if (parsed && parsed.playerId && parsed.nickname) {
-          console.log(`🔄 Player rejoining: ${parsed.nickname} with ID: ${parsed.playerId}`);
-          console.log(`📍 clientIdRef.current = ${clientIdRef.current}`);
-          setTimeout(() => {
-            s.emit("joinRoom", { 
-              roomId: id, 
-              player: { 
-                id: parsed.playerId, // Use saved ID from sessionStorage
-                name: parsed.nickname, 
-                color: parsed.color 
-              },
-              isHost: false
-            });
-            console.log(`✉️ Emitted joinRoom with ID: ${parsed.playerId}`);
-          }, 100);
-        }
-      });
+      // Remove old listeners first to prevent duplicates
+      s.off("connect");
+      s.off("roomUpdate");
+      s.off("playersUpdate");
+      s.off("answersUpdate");
+      s.off("gameStarted");
+      s.off("nextRound");
+      s.off("roundResult");
       
+      // Set up ALL event listeners FIRST before joining
       // Listen for room updates
       s.on("roomUpdate", (room) => {
-        console.log("Room updated:", room);
+        console.log("[Room] roomUpdate event - phase:", room.phase, "round:", room.currentRound);
         setPhase(room.phase);
         setCurrentQuestion(room.currentQuestion);
         setCurrentRound(room.currentRound);
@@ -208,14 +172,71 @@ export default function RoomPage() {
         console.log("Round result:", result);
         setRoundResult(result);
       });
+      
+      // NOW define the join function AFTER all listeners are set
+      const handleRoomJoin = () => {
+        const storageKey = `room_${id}`;
+        const savedData = sessionStorage.getItem(storageKey);
+        const parsed = savedData ? JSON.parse(savedData) : null;
+        
+        // Handle host (new or rejoining)
+        if ((isHostParam && hostIdParam) || (parsed && parsed.isHost)) {
+          const activeHostId = hostIdParam || parsed.hostId;
+          
+          console.log(`[Room] Host creating/joining room ${id} with hostId: ${activeHostId}`);
+          
+          // First create the room (will check if exists)
+          s.emit("createRoom", { 
+            roomId: id, 
+            hostId: activeHostId
+          });
+          
+          // Then join it
+          s.emit("joinRoom", { 
+            roomId: id, 
+            isHost: true,
+            hostId: activeHostId
+          });
+          
+          setJoined(true);
+          setIsRejoining(false);
+        }
+        // Handle player rejoining after refresh
+        else if (parsed && parsed.playerId && parsed.nickname) {
+          console.log(`[Room] Player rejoining: ${parsed.nickname} with ID: ${parsed.playerId}`);
+          s.emit("joinRoom", { 
+            roomId: id, 
+            player: { 
+              id: parsed.playerId,
+              name: parsed.nickname, 
+              color: parsed.color 
+            },
+            isHost: false
+          });
+          setIsRejoining(false);
+        }
+      };
+      
+      // Listen for connect events
+      s.on("connect", () => {
+        console.log("[Room] Socket connected:", s.id);
+        handleRoomJoin();
+      });
+      
+      // If socket is already connected, join immediately
+      if (s.connected) {
+        console.log("[Room] Socket already connected, joining room immediately");
+        handleRoomJoin();
+        
+        // Request current room state to ensure we have latest data
+        console.log("[Room] Requesting room state update");
+        setTimeout(() => {
+          s.emit("requestRoomState", { roomId: id });
+        }, 100);
+      }
     });
 
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.removeAllListeners();
-        socketRef.current.disconnect();
-      }
-    };
+    // Don't disconnect on unmount - socket is managed by socketManager singleton
   }, [id]);
 
   const joinRoom = () => {
@@ -313,126 +334,8 @@ export default function RoomPage() {
       )}
 
       <section className="relative z-10 max-w-5xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-6 pb-10">
-        {/* Lobby Phase - Full Width */}
-        {phase === "lobby" ? (
-          <div className="md:col-span-3 space-y-6">
-            {/* Lobby Content */}
-            <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl border border-yellow-200 p-6">
-              {/* Lobby Phase - Kahoot Style */}
-              {isRejoining ? (
-                <div className="text-center py-8">
-                  <div className="text-5xl mb-4">🔄</div>
-                  <h2 className="text-2xl font-bold text-blue-900 mb-2">
-                    กำลังเชื่อมต่อใหม่...
-                  </h2>
-                  <p className="text-blue-900/60">กรุณารอสักครู่</p>
-                </div>
-              ) : !joined && !isHost ? (
-                <div className="flex flex-col gap-4">
-                  <label htmlFor="nickname" className="sr-only">Nickname</label>
-                  <input
-                    id="nickname"
-                    type="text"
-                    placeholder="ใส่ชื่อของคุณ"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && joinRoom()}
-                    className="flex-1 rounded-full border border-blue-300 px-5 py-3 text-blue-900 placeholder-blue-900/50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white/80"
-                  />
-                  <div>
-                    <p className="text-blue-900/80 text-sm mb-2">เลือกสีของคุณ</p>
-                    <div className="flex flex-wrap gap-2">
-                      {colorOptions.map((key) => (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => setColorKey(key)}
-                          aria-label={`choose ${key}`}
-                          className={`h-8 w-8 rounded-full border-2 ${colorKey === key ? 'border-blue-900 scale-105' : 'border-transparent'} transition ${colorKeyToBg[key]}`}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={joinRoom}
-                    className="rounded-full bg-blue-700 hover:bg-blue-800 text-white font-semibold px-6 py-3 shadow-md transition"
-                  >
-                    เข้าร่วมห้อง
-                  </button>
-                </div>
-              ) : (
-                  <div className="min-h-[600px] flex flex-col py-8">
-                    {/* 1. Game PIN - ข้างบนสุด */}
-                    <div className="text-center mb-8">
-                      <p className="text-gray-600 text-sm mb-2 font-medium">Game PIN</p>
-                      <div className="bg-white rounded-xl shadow-lg px-16 py-6 inline-block">
-                        <p className="text-8xl font-black text-gray-800 tracking-wider font-mono">
-                          {id}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* 2. จำนวน Players และปุ่ม - w-full between */}
-                    <div className="w-full flex items-center justify-between mb-8 px-4">
-                      {/* ซ้าย: จำนวน Players */}
-                      <div className="flex items-center gap-2">
-                        <svg className="w-6 h-6 text-gray-700" fill="currentColor" viewBox="0 0 20 20">
-                          <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                        </svg>
-                        <span className="text-2xl font-bold text-gray-800">{players.length}</span>
-                        <span className="text-gray-600">Players</span>
-                      </div>
-
-                      {/* ขวา: ปุ่ม Start (Host) หรือ Back (Player) */}
-                      {isHost ? (
-                        <button
-                          type="button"
-                          onClick={() => socketRef.current?.emit("startGame", { roomId: id })}
-                          className="rounded-lg bg-green-500 hover:bg-green-600 text-white font-bold px-8 py-3 transition shadow-lg"
-                        >
-                          Start
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => router.push("/")}
-                          className="rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-6 py-2.5 transition"
-                        >
-                          Back
-                        </button>
-                      )}
-                    </div>
-
-                    {/* 3. Player Names - flex row grid */}
-                    <div className="flex-1 overflow-y-auto px-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {players.map((p, i) => {
-                          const playerName = typeof p === "object" ? p.name ?? "Player" : String(p);
-                          return (
-                            <div
-                              key={i}
-                              className="bg-white rounded-lg shadow-md px-6 py-4 text-center font-semibold text-gray-800 hover:shadow-lg transition"
-                            >
-                              {playerName}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      
-                      {/* Waiting Message */}
-                      {!isHost && (
-                        <div className="text-center mt-8">
-                          <p className="text-gray-600 text-lg">Waiting for host to start...</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-              )}
-            </article>
-          </div>
-        ) : (
-          /* Other Phases - with Sidebar */
+        {/* Game Phases Only - Lobby is in separate page */}
+        {phase !== "lobby" && (
           <>
             <div className="md:col-span-2 space-y-6">
               {/* Host Controls (Simple Inline) */}
@@ -597,10 +500,16 @@ export default function RoomPage() {
                       )}
                     </div>
 
-                    {roundResult.winner && (
+                    {roundResult.winner ? (
                       <div className="rounded-xl bg-yellow-100 border border-yellow-300 p-4 text-center">
                         <p className="text-yellow-900 font-semibold">
                           🏆 คำตอบที่ใกล้ที่สุด: <span className="font-bold">{roundResult.winner.guess}</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="rounded-xl bg-red-100 border border-red-300 p-4 text-center">
+                        <p className="text-red-900 font-semibold">
+                          ❌ ไม่มีผู้ชนะ - ทุกคนตอบเกินเฉลย!
                         </p>
                       </div>
                     )}

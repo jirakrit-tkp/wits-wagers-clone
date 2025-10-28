@@ -51,6 +51,14 @@ export default function handler(req, res) {
           return;
         }
 
+        // Check if socket already in this room to prevent duplicate joins
+        const rooms = Array.from(socket.rooms);
+        if (rooms.includes(roomId)) {
+          console.log(`Socket ${socket.id} already in room ${roomId}, ignoring duplicate join`);
+          // Don't send any events to prevent triggering more loops
+          return;
+        }
+
         // Join room first
         socket.join(roomId);
         console.log(`Socket ${socket.id} joined room ${roomId}`);
@@ -90,14 +98,10 @@ export default function handler(req, res) {
           
           const updatedRoom = getRoom(roomId);
           
-          // Send updated players list to the rejoining/new player
-          socket.emit("playersUpdate", updatedRoom.players);
-          socket.emit("roomUpdate", updatedRoom);
-          socket.emit("answersUpdate", updatedRoom.answers);
-          
-          // Now broadcast the updated list to EVERYONE in the room
+          // IMPORTANT: Always broadcast to EVERYONE first (including this socket)
           io.to(roomId).emit("playersUpdate", updatedRoom.players);
           io.to(roomId).emit("roomUpdate", updatedRoom);
+          io.to(roomId).emit("answersUpdate", updatedRoom.answers);
         }
       });
 
@@ -112,8 +116,20 @@ export default function handler(req, res) {
         submitAnswer(roomId, playerId, guess);
         const updatedRoom = getRoom(roomId);
         
-        console.log(`Answer submitted in room ${roomId}. Total answers: ${updatedRoom.answers.length}`);
+        console.log(`Answer submitted in room ${roomId}. Total answers: ${updatedRoom.answers.length}/${updatedRoom.players.length}`);
         io.to(roomId).emit("answersUpdate", updatedRoom.answers);
+        
+        // Auto-reveal when all players have submitted
+        if (updatedRoom.answers.length === updatedRoom.players.length && updatedRoom.players.length > 0) {
+          console.log(`🎯 All players answered! Auto-revealing for room ${roomId}`);
+          
+          if (updatedRoom.currentQuestion) {
+            const result = revealAnswer(roomId, updatedRoom.currentQuestion.answer);
+            console.log(`Answer auto-revealed in room ${roomId}`);
+            io.to(roomId).emit("roundResult", result);
+            io.to(roomId).emit("roomUpdate", updatedRoom);
+          }
+        }
       });
 
       socket.on("placeBet", ({ roomId, playerId, betOn }) => {
@@ -146,18 +162,24 @@ export default function handler(req, res) {
       });
 
       socket.on("startGame", ({ roomId }) => {
+        console.log(`[Server] 🎮 startGame event received for room ${roomId}`);
         const room = getRoom(roomId);
         if (!room) {
-          console.error(`Room ${roomId} not found for startGame`);
+          console.error(`[Server] Room ${roomId} not found for startGame`);
           return;
         }
         
         const result = startGame(roomId);
         if (result) {
           const updatedRoom = getRoom(roomId);
-          console.log(`Game started in room ${roomId}, round ${result.round}`);
+          console.log(`[Server] ✅ Game started in room ${roomId}, round ${result.round}, phase: ${updatedRoom.phase}`);
+          console.log(`[Server] 📤 Emitting to room ${roomId}: playersUpdate (${updatedRoom.players.length} players), answersUpdate (${updatedRoom.answers.length} answers)`);
           io.to(roomId).emit("gameStarted", result);
           io.to(roomId).emit("roomUpdate", updatedRoom);
+          io.to(roomId).emit("playersUpdate", updatedRoom.players); // Send players list!
+          io.to(roomId).emit("answersUpdate", updatedRoom.answers); // Send answers list!
+        } else {
+          console.error(`[Server] ❌ Failed to start game in room ${roomId}`);
         }
       });
 
@@ -174,6 +196,8 @@ export default function handler(req, res) {
           console.log(`Next round in room ${roomId}, phase: ${result.phase}`);
           io.to(roomId).emit("nextRound", result);
           io.to(roomId).emit("roomUpdate", updatedRoom);
+          io.to(roomId).emit("playersUpdate", updatedRoom.players); // Send players list!
+          io.to(roomId).emit("answersUpdate", updatedRoom.answers); // Send answers list!
         }
       });
 
@@ -250,6 +274,21 @@ export default function handler(req, res) {
         
         // Confirm to the leaving player
         socket.emit("leftRoom", { roomId });
+      });
+
+      socket.on("requestRoomState", ({ roomId }) => {
+        console.log(`[Socket] requestRoomState received for room ${roomId} from socket ${socket.id}`);
+        const room = getRoom(roomId);
+        if (!room) {
+          console.error(`[Socket] Room ${roomId} not found for requestRoomState`);
+          return;
+        }
+        
+        // Send current room state to the requesting socket
+        socket.emit("roomUpdate", room);
+        socket.emit("playersUpdate", room.players);
+        socket.emit("answersUpdate", room.answers);
+        console.log(`[Socket] Sent room state to socket ${socket.id}: ${room.players.length} players, ${room.answers.length} answers`);
       });
 
       socket.on("disconnect", () => {

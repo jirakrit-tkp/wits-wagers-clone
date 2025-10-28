@@ -74,13 +74,25 @@ export function revealAnswer(roomId, correctAnswer) {
     .filter(a => a.diff >= 0)
     .sort((a, b) => a.diff - b.diff);
 
-  const winner = validAnswers[0];
-  if (!winner) return;
+  let winner = validAnswers[0] || null;
+  
+  // If no one answered without exceeding (all guesses are too high),
+  // then NO WINNER - no one gets points
+  if (!winner && room.answers.length > 0) {
+    console.log('[gameState] ❌ No winner - all guesses exceeded the correct answer!');
+    const sortedByGuess = [...room.answers].sort((a, b) => a.guess - b.guess);
+    const smallestGuess = sortedByGuess[0];
+    console.log(`[gameState] Smallest guess was: ${smallestGuess.playerId} with ${smallestGuess.guess} (but correct answer was ${correctAnswer})`);
+  } else if (winner) {
+    console.log(`[gameState] ✅ Winner: ${winner.playerId} with ${winner.guess} (correct: ${correctAnswer})`);
+  }
 
-  // Award points to those who bet correctly
-  for (const bet of room.bets) {
-    if (bet.betOn === winner.playerId) {
-      room.scores[bet.playerId] += 10; // Fixed points
+  // Award points ONLY if there's a winner
+  if (winner) {
+    for (const bet of room.bets) {
+      if (bet.betOn === winner.playerId) {
+        room.scores[bet.playerId] += 10; // Fixed points
+      }
     }
   }
 
@@ -122,18 +134,29 @@ export function getRandomQuestion(category = null) {
 
 // Start the game
 export function startGame(roomId) {
+  console.log(`[gameState] startGame called for room ${roomId}`);
   const room = getRoom(roomId);
-  if (!room) return null;
+  if (!room) {
+    console.error(`[gameState] ❌ Room ${roomId} not found!`);
+    return null;
+  }
+  
+  console.log(`[gameState] Room found with ${room.players.length} players, current phase: ${room.phase}`);
   
   const question = getRandomQuestion();
-  if (!question) return null;
+  if (!question) {
+    console.error(`[gameState] ❌ No question available!`);
+    return null;
+  }
   
+  console.log(`[gameState] Question selected: ${question.question}`);
   room.phase = 'question';
   room.currentQuestion = question;
   room.currentRound = 1;
   room.answers = [];
   room.bets = [];
   
+  console.log(`[gameState] ✅ Phase changed to: ${room.phase}, round: ${room.currentRound}`);
   return { phase: room.phase, question, round: room.currentRound };
 }
 
