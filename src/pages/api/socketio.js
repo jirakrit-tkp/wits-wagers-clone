@@ -6,7 +6,9 @@ import {
   removePlayer,
   submitAnswer,
   placeBet,
-  revealAnswer,
+  confirmWager,
+  revealAnswersAndPrepareWagers,
+  revealCorrectAnswerAndPayout,
   getRoom,
   startGame,
   nextRound,
@@ -119,20 +121,23 @@ export default function handler(req, res) {
         console.log(`Answer submitted in room ${roomId}. Total answers: ${updatedRoom.answers.length}/${updatedRoom.players.length}`);
         io.to(roomId).emit("answersUpdate", updatedRoom.answers);
         
-        // Auto-reveal when all players have submitted
+        // Auto-reveal answers and transition to wager phase when all players have submitted
         if (updatedRoom.answers.length === updatedRoom.players.length && updatedRoom.players.length > 0) {
-          console.log(`🎯 All players answered! Auto-revealing for room ${roomId}`);
+          console.log(`🎯 All players answered! Auto-revealing answers and transitioning to wager phase for room ${roomId}`);
           
-          if (updatedRoom.currentQuestion) {
-            const result = revealAnswer(roomId, updatedRoom.currentQuestion.answer);
-            console.log(`Answer auto-revealed in room ${roomId}`);
-            io.to(roomId).emit("roundResult", result);
-            io.to(roomId).emit("roomUpdate", updatedRoom);
+          const result = revealAnswersAndPrepareWagers(roomId);
+          if (result) {
+            const finalRoom = getRoom(roomId);
+            console.log(`✅ Transition complete. Phase: ${finalRoom.phase}, Tiles: ${result.answerTiles.length}`);
+            console.log(`🎁 Zero-chip players:`, result.zeroChipPlayers);
+            io.to(roomId).emit("answersRevealed", result);
+            io.to(roomId).emit("roomUpdate", finalRoom);
+            io.to(roomId).emit("chipsUpdate", finalRoom.chips);
           }
         }
       });
 
-      socket.on("placeBet", ({ roomId, playerId, betOn }) => {
+      socket.on("placeBet", ({ roomId, playerId, tileIndex, amount }) => {
         const room = getRoom(roomId);
         if (!room) {
           console.error(`Room ${roomId} not found for placeBet`);
@@ -140,8 +145,62 @@ export default function handler(req, res) {
           return;
         }
         
-        placeBet(roomId, playerId, betOn);
-        console.log(`Bet placed in room ${roomId}`);
+        const result = placeBet(roomId, playerId, tileIndex, amount);
+        
+        if (result.success) {
+          console.log(`✅ Bet placed in room ${roomId}: ${playerId} bet ${amount} on tile ${tileIndex}`);
+          const updatedRoom = getRoom(roomId);
+          io.to(roomId).emit("betsUpdate", { 
+            bets: updatedRoom.bets,
+            chips: updatedRoom.chips 
+          });
+        } else {
+          console.log(`❌ Bet failed: ${result.error}`);
+          socket.emit("betError", { error: result.error });
+        }
+      });
+
+      socket.on("confirmWagers", ({ roomId, playerId }) => {
+        const room = getRoom(roomId);
+        if (!room) {
+          console.error(`Room ${roomId} not found for confirmWagers`);
+          socket.emit("error", { message: "Room not found" });
+          return;
+        }
+        
+        const result = confirmWager(roomId, playerId);
+        
+        if (result.success) {
+          console.log(`✅ Player ${playerId} confirmed wagers in room ${roomId} (${result.confirmedCount}/${result.totalPlayers})`);
+          
+          // Broadcast confirmation status to all players
+          const updatedRoom = getRoom(roomId);
+          io.to(roomId).emit("wagersConfirmed", { 
+            confirmedCount: result.confirmedCount,
+            totalPlayers: result.totalPlayers,
+            confirmedWagers: updatedRoom.confirmedWagers
+          });
+          
+          // Auto-reveal if all players confirmed
+          if (result.allConfirmed) {
+            console.log(`🎯 All players confirmed wagers! Auto-revealing correct answer for room ${roomId}`);
+            
+            if (updatedRoom.currentQuestion) {
+              const payoutResult = revealCorrectAnswerAndPayout(roomId, updatedRoom.currentQuestion.answer);
+              
+              if (payoutResult) {
+                const finalRoom = getRoom(roomId);
+                console.log(`✅ Payouts calculated. Emitting results to room ${roomId}`);
+                io.to(roomId).emit("payoutResult", payoutResult);
+                io.to(roomId).emit("roomUpdate", finalRoom);
+                io.to(roomId).emit("chipsUpdate", finalRoom.chips);
+              }
+            }
+          }
+        } else {
+          console.log(`❌ Confirm wagers failed for ${playerId}: ${result.error}`);
+          socket.emit("confirmWagerError", { error: result.error });
+        }
       });
 
       socket.on("revealAnswer", ({ roomId }) => {
@@ -155,10 +214,16 @@ export default function handler(req, res) {
           return;
         }
         
-        const result = revealAnswer(roomId, room.currentQuestion.answer);
-        console.log(`Answer revealed in room ${roomId}`);
-        io.to(roomId).emit("roundResult", result);
-        io.to(roomId).emit("roomUpdate", room);
+        console.log(`[Server] Revealing correct answer and calculating payouts for room ${roomId}`);
+        const result = revealCorrectAnswerAndPayout(roomId, room.currentQuestion.answer);
+        
+        if (result) {
+          const updatedRoom = getRoom(roomId);
+          console.log(`✅ Payouts calculated. Emitting results to room ${roomId}`);
+          io.to(roomId).emit("payoutResult", result);
+          io.to(roomId).emit("roomUpdate", updatedRoom);
+          io.to(roomId).emit("chipsUpdate", updatedRoom.chips);
+        }
       });
 
       socket.on("startGame", ({ roomId }) => {
@@ -173,11 +238,12 @@ export default function handler(req, res) {
         if (result) {
           const updatedRoom = getRoom(roomId);
           console.log(`[Server] ✅ Game started in room ${roomId}, round ${result.round}, phase: ${updatedRoom.phase}`);
-          console.log(`[Server] 📤 Emitting to room ${roomId}: playersUpdate (${updatedRoom.players.length} players), answersUpdate (${updatedRoom.answers.length} answers)`);
+          console.log(`[Server] 📤 Emitting to room ${roomId}: playersUpdate (${updatedRoom.players.length} players), chips:`, updatedRoom.chips);
           io.to(roomId).emit("gameStarted", result);
           io.to(roomId).emit("roomUpdate", updatedRoom);
-          io.to(roomId).emit("playersUpdate", updatedRoom.players); // Send players list!
-          io.to(roomId).emit("answersUpdate", updatedRoom.answers); // Send answers list!
+          io.to(roomId).emit("playersUpdate", updatedRoom.players);
+          io.to(roomId).emit("answersUpdate", updatedRoom.answers);
+          io.to(roomId).emit("chipsUpdate", updatedRoom.chips); // Send initial chips!
         } else {
           console.error(`[Server] ❌ Failed to start game in room ${roomId}`);
         }
@@ -196,8 +262,9 @@ export default function handler(req, res) {
           console.log(`Next round in room ${roomId}, phase: ${result.phase}`);
           io.to(roomId).emit("nextRound", result);
           io.to(roomId).emit("roomUpdate", updatedRoom);
-          io.to(roomId).emit("playersUpdate", updatedRoom.players); // Send players list!
-          io.to(roomId).emit("answersUpdate", updatedRoom.answers); // Send answers list!
+          io.to(roomId).emit("playersUpdate", updatedRoom.players);
+          io.to(roomId).emit("answersUpdate", updatedRoom.answers);
+          io.to(roomId).emit("chipsUpdate", updatedRoom.chips); // Send updated chips!
         }
       });
 
