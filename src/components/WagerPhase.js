@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import ConfirmModal from "./ConfirmModal";
 
 const WagerPhase = ({ 
   answerTiles, 
@@ -15,6 +16,8 @@ const WagerPhase = ({
 }) => {
   const [pendingBets, setPendingBets] = useState({}); // { tileIndex: amount } - before confirm
   const [error, setError] = useState("");
+  const [showZeroChipConfirm, setShowZeroChipConfirm] = useState(false);
+  const [pendingTileSelection, setPendingTileSelection] = useState(null);
   
   const myChips = chips[myPlayerId] || 0;
   const totalPendingBet = Object.values(pendingBets).reduce((sum, amount) => sum + amount, 0);
@@ -103,29 +106,19 @@ const WagerPhase = ({
 
   const handleZeroChipTileSelect = (tileIndex) => {
     if (!isZeroChipPlayer || hasSelectedTile) return;
-    
-    // Get tile info for confirmation message
-    const tile = answerTiles[tileIndex];
-    const tileName = tile?.isSmallerTile ? 'Smaller than all' : tile?.guess;
-    const bonusMessage = allPlayersZeroChip 
-      ? 'If correct, you get 250 chips'
-      : 'If correct, you get 25% of max prize';
-    
-    // Show confirmation dialog
-    const confirmed = window.confirm(
-      `Confirm selection "${tileName}"?\n\n` +
-      `${bonusMessage}\n` +
-      `(Cannot change after selection)`
-    );
-    
-    if (!confirmed) {
-      console.log(`[WagerPhase] Zero-chip player cancelled selection`);
-      return;
-    }
+    setPendingTileSelection(tileIndex);
+    setShowZeroChipConfirm(true);
+  };
+
+  const confirmZeroChipSelection = () => {
+    if (pendingTileSelection === null) return;
     
     // Place a zero-chip bet
-    onPlaceBet(tileIndex, 0);
-    console.log(`[WagerPhase] Zero-chip player selected tile ${tileIndex}`);
+    onPlaceBet(pendingTileSelection, 0);
+    console.log(`[WagerPhase] Zero-chip player selected tile ${pendingTileSelection}`);
+    
+    // Reset state
+    setPendingTileSelection(null);
   };
 
   const getPlayerName = (playerId) => {
@@ -141,13 +134,45 @@ const WagerPhase = ({
     );
   }
 
+  // Get confirmation message data
+  const getConfirmationMessage = () => {
+    if (pendingTileSelection === null) return { title: "", message: "" };
+    const tile = answerTiles[pendingTileSelection];
+    const tileName = tile?.isSmallerTile ? 'Smaller than all' : tile?.guess;
+    const bonusMessage = allPlayersZeroChip 
+      ? 'If correct, you get 250 chips'
+      : 'If correct, you get 25% of max prize';
+    
+    return {
+      title: "Confirm Selection?",
+      message: `Select "${tileName}"?\n\n${bonusMessage}\n\n(Cannot change after selection)`
+    };
+  };
+
+  const confirmData = getConfirmationMessage();
+
   return (
-    <div className="space-y-6">
-      {error && (
-        <div className="rounded-lg bg-red-100 border border-red-300 p-3 text-red-700 text-sm">
-          ⚠️ {error}
-        </div>
-      )}
+    <>
+      <ConfirmModal
+        isOpen={showZeroChipConfirm}
+        onClose={() => {
+          setShowZeroChipConfirm(false);
+          setPendingTileSelection(null);
+        }}
+        onConfirm={confirmZeroChipSelection}
+        title={confirmData.title}
+        message={confirmData.message}
+        confirmText="Confirm"
+        cancelText="Cancel"
+        isDanger={false}
+      />
+      
+      <div className="space-y-6">
+        {error && (
+          <div className="rounded-lg bg-red-100 border border-red-300 p-3 text-red-700 text-sm">
+            ⚠️ {error}
+          </div>
+        )}
 
       {/* Wager Table - Snooker Style */}
       <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-4 sm:p-6 shadow-2xl">
@@ -443,6 +468,7 @@ const WagerPhase = ({
         </div>
       </div>
     </div>
+    </>
   );
 };
 

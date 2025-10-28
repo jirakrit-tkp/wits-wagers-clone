@@ -1,4 +1,9 @@
+import { useState } from "react";
+import ConfirmModal from "./ConfirmModal";
+
 const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost, hostId }) => {
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   if (!isHost) {
     return null;
   }
@@ -8,19 +13,27 @@ const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost
   };
 
   const handleDeleteRoom = () => {
-    if (window.confirm("Delete this room? All players will be kicked out.")) {
-      socket?.emit("deleteRoom", { roomId, hostId });
-      // Clear session storage
-      sessionStorage.removeItem(`room_${roomId}`);
-      sessionStorage.removeItem(`room_${roomId}_isHost`);
-      sessionStorage.removeItem(`room_${roomId}_hostId`);
-      // Redirect host to landing page immediately
-      window.location.href = "/";
-    }
+    socket?.emit("deleteRoom", { roomId, hostId });
+    sessionStorage.removeItem(`room_${roomId}`);
+    sessionStorage.removeItem(`room_${roomId}_isHost`);
+    sessionStorage.removeItem(`room_${roomId}_hostId`);
+    window.location.href = "/";
   };
 
   return (
-    <section className="bg-black shadow-xl overflow-hidden">
+    <>
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteRoom}
+        title="Delete Room?"
+        message="Are you sure you want to delete this room? All players will be kicked out."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDanger={true}
+      />
+      
+      <section className="bg-black shadow-xl overflow-hidden">
       {/* Desktop: Horizontal layout */}
       <div className="hidden md:flex p-4 items-center justify-between">
         <h2 className="text-white font-bold text-lg">Host Controls</h2>
@@ -48,7 +61,7 @@ const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost
 
           <button
             type="button"
-            onClick={handleDeleteRoom}
+            onClick={() => setShowDeleteConfirm(true)}
             className="rounded-xl bg-black hover:bg-red-600 text-white font-semibold px-6 py-3 shadow-lg transition"
           >
             Delete Room
@@ -82,13 +95,14 @@ const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost
 
         <button
           type="button"
-          onClick={handleDeleteRoom}
+          onClick={() => setShowDeleteConfirm(true)}
           className="w-full rounded-md bg-black hover:bg-red-600 text-white font-semibold px-4 py-2 text-sm transition"
         >
           Delete Room
         </button>
       </div>
     </section>
+    </>
   );
 };
 

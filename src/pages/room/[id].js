@@ -5,6 +5,7 @@ import QuestionCard from "@/components/QuestionCard";
 import WagerPhase from "@/components/WagerPhase";
 import PayoutPhase from "@/components/PayoutPhase";
 import HostControls from "@/components/HostControls";
+import Snackbar from "@/components/Snackbar";
 
 export default function RoomPage() {
   const router = useRouter();
@@ -42,6 +43,9 @@ export default function RoomPage() {
   const [currentBets, setCurrentBets] = useState([]);
   const [confirmedWagers, setConfirmedWagers] = useState([]);
   const [zeroChipPlayers, setZeroChipPlayers] = useState([]);
+  
+  // Snackbar state
+  const [snackbar, setSnackbar] = useState({ isOpen: false, message: "", type: "info" });
 
   const colorOptions = ["red-500", "amber-500", "emerald-500", "sky-500", "violet-500", "rose-500"];
   const colorKeyToBg = {
@@ -226,7 +230,7 @@ export default function RoomPage() {
       // Listen for confirm wager errors
       s.on("confirmWagerError", (data) => {
         console.error("[Room] Confirm wager error:", data.error);
-        alert(data.error);
+        setSnackbar({ isOpen: true, message: data.error, type: "error" });
       });
       
       // NOW define the join function AFTER all listeners are set
@@ -384,12 +388,21 @@ export default function RoomPage() {
   };
 
   return (
-    <main className="min-h-screen bg-yellow-200 relative overflow-hidden flex flex-col">
-      {/* Radial gradient base - like landing page */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_50%_50%,#fde047_0%,#facc15_35%,#eab308_60%,#ca8a04_100%)] [mask-image:radial-gradient(circle_at_50%_50%,rgba(0,0,0,1)_0%,rgba(0,0,0,0.85)_35%,rgba(0,0,0,0.6)_60%,rgba(0,0,0,0.25)_100%)]"
+    <>
+      <Snackbar
+        isOpen={snackbar.isOpen}
+        onClose={() => setSnackbar({ ...snackbar, isOpen: false })}
+        message={snackbar.message}
+        type={snackbar.type}
+        duration={3000}
       />
+      
+      <main className="min-h-screen bg-yellow-200 relative overflow-hidden flex flex-col">
+        {/* Radial gradient base - like landing page */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_50%_50%,#fde047_0%,#facc15_35%,#eab308_60%,#ca8a04_100%)] [mask-image:radial-gradient(circle_at_50%_50%,rgba(0,0,0,1)_0%,rgba(0,0,0,0.85)_35%,rgba(0,0,0,0.6)_60%,rgba(0,0,0,0.25)_100%)]"
+        />
 
       {/* No header needed - Room PIN in sidebar */}
 
@@ -973,6 +986,7 @@ export default function RoomPage() {
         )}
       </section>
     </main>
+    </>
   );
 }
 

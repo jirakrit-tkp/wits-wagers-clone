@@ -2,6 +2,8 @@ import { useRouter } from "next/router";
 import { useEffect, useRef, useState } from "react";
 import { getSocket } from "@/lib/socketManager";
 import questionsData from "@/lib/questions.json";
+import ConfirmModal from "@/components/ConfirmModal";
+import Snackbar from "@/components/Snackbar";
 
 const LobbyPage = () => {
   const router = useRouter();
@@ -24,6 +26,11 @@ const LobbyPage = () => {
   const [selectedCategories, setSelectedCategories] = useState(availableCategories);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  
+  // Modal states
+  const [showNameAlert, setShowNameAlert] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -277,7 +284,7 @@ const LobbyPage = () => {
   // Join Room function for players
   const joinRoom = () => {
     if (!nickname.trim()) {
-      alert("Please enter a name");
+      setShowNameAlert(true);
       return;
     }
 
@@ -349,27 +356,28 @@ const LobbyPage = () => {
   // Delete Room function for host
   const handleDeleteRoom = () => {
     if (!socketRef.current || !isHost || !hostId) return;
-    
-    const confirmDelete = window.confirm("Are you sure you want to delete this room? All players will be redirected to home page");
-    if (!confirmDelete) return;
-
     socketRef.current.emit("deleteRoom", { roomId: id, hostId: hostId });
   };
 
   // Leave Room function for players
   const handleLeaveRoom = () => {
     if (!socketRef.current || !playerId) return;
-
-    const confirmLeave = window.confirm("Are you sure you want to leave this room?");
-    if (!confirmLeave) return;
-
     socketRef.current.emit("leaveRoom", { roomId: id, playerId: playerId });
   };
 
   if (!joined && !isHost) {
     // Player Join Form
     return (
-      <div className="relative min-h-screen bg-yellow-200 flex items-center justify-center p-4 overflow-hidden">
+      <>
+        <Snackbar
+          isOpen={showNameAlert}
+          onClose={() => setShowNameAlert(false)}
+          message="Please enter your name to join the room"
+          type="warning"
+          duration={3000}
+        />
+        
+        <div className="relative min-h-screen bg-yellow-200 flex items-center justify-center p-4 overflow-hidden">
         {/* Radial gradient base - like landing page */}
         <div
           aria-hidden
@@ -441,12 +449,44 @@ const LobbyPage = () => {
           </form>
         </article>
       </div>
+      </>
     );
   }
 
   // Lobby view (for both host and players)
   return (
-    <div className="relative min-h-screen bg-yellow-200 overflow-hidden">
+    <>
+      <Snackbar
+        isOpen={showNameAlert}
+        onClose={() => setShowNameAlert(false)}
+        message="Please enter your name to join the room"
+        type="warning"
+        duration={3000}
+      />
+      
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteRoom}
+        title="Delete Room?"
+        message="Are you sure you want to delete this room? All players will be redirected to the home page."
+        confirmText="Delete"
+        cancelText="Cancel"
+        isDanger={true}
+      />
+      
+      <ConfirmModal
+        isOpen={showLeaveConfirm}
+        onClose={() => setShowLeaveConfirm(false)}
+        onConfirm={handleLeaveRoom}
+        title="Leave Room?"
+        message="Are you sure you want to leave this room?"
+        confirmText="Leave"
+        cancelText="Cancel"
+        isDanger={false}
+      />
+      
+      <div className="relative min-h-screen bg-yellow-200 overflow-hidden">
       {/* Radial gradient base - like landing page */}
       <div
         aria-hidden
@@ -569,7 +609,7 @@ const LobbyPage = () => {
 
                       <button
                         type="button"
-                        onClick={handleDeleteRoom}
+                        onClick={() => setShowDeleteConfirm(true)}
                         className="rounded-xl bg-black/90 hover:bg-red-600 text-white font-bold px-6 py-4 text-lg transition shadow-lg transform hover:scale-105"
                         title="Delete Room"
                       >
@@ -586,7 +626,7 @@ const LobbyPage = () => {
                   ) : (
                     <button
                       type="button"
-                      onClick={handleLeaveRoom}
+                      onClick={() => setShowLeaveConfirm(true)}
                       className="rounded-xl bg-black/90 hover:bg-red-500 text-white font-semibold px-6 py-3 transition shadow-lg"
                     >
                       Leave
@@ -646,6 +686,7 @@ const LobbyPage = () => {
         }
       `}</style>
     </div>
+    </>
   );
 };
 
