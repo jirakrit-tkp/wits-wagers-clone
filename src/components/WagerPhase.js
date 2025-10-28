@@ -118,95 +118,15 @@ const WagerPhase = ({
 
   return (
     <div className="space-y-6">
-      {/* Zero-Chip Player Special Message */}
-      {isZeroChipPlayer && !isHost && (
-        <article className={`rounded-xl p-6 shadow-xl border-2 transition-all ${
-          hasSelectedTile 
-            ? 'bg-gradient-to-r from-green-500 to-green-600 border-green-300' 
-            : 'bg-gradient-to-r from-purple-500 to-pink-500 border-purple-300 animate-pulse'
-        }`}>
-          <div className="text-center">
-            <div className="text-5xl mb-3">{hasSelectedTile ? '✅' : '🎁'}</div>
-            <h3 className="text-white text-2xl font-bold mb-2">
-              {hasSelectedTile ? 'Tile Selected!' : 'Special Chance!'}
-            </h3>
-            {hasSelectedTile && myZeroChipBet ? (
-              <>
-                <p className="text-white mb-2">
-                  {"You selected: "}<span className="font-bold text-3xl">{myZeroChipBet.tileIndex === 0 ? 'Smaller than all' : answerTiles[myZeroChipBet.tileIndex]?.guess}</span>
-                </p>
-                <p className="text-green-100 text-sm">
-                  {allPlayersZeroChip 
-                    ? '🌟 If correct, get 250 chips 🌟'
-                    : '🌟 If correct, get 25% of max prize 🌟'
-                  }
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-purple-100 mb-3">
-                  {"You're out of chips, but still have a chance to win!"}
-                </p>
-                <p className="text-white font-semibold text-lg mb-2">
-                  🎯 Click to select 1 tile
-                </p>
-                <p className="text-white text-sm">
-                  {allPlayersZeroChip 
-                    ? '🌟 If correct → Get 250 chips 🌟'
-                    : '🌟 If correct → Get 25% of max prize 🌟'
-                  }
-                </p>
-                <p className="text-purple-100 text-xs mt-2">
-                  {"(If wrong, no penalty but can continue playing)"}
-                </p>
-              </>
-            )}
-          </div>
-        </article>
-      )}
-
-      {/* Chips Display */}
-      <article className="rounded-xl bg-gradient-to-r from-yellow-400 to-yellow-500 p-4 shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-yellow-900 text-sm font-medium">Current Chips</p>
-            <p className="text-3xl font-bold text-white">{myChips} 🪙</p>
-          </div>
-          {totalPlacedBet > 0 && (
-            <div className="text-right">
-              <p className="text-yellow-900 text-sm font-medium">Placed</p>
-              <p className="text-2xl font-bold text-green-700">{totalPlacedBet} 🪙</p>
-            </div>
-          )}
-          {totalPendingBet > 0 && (
-            <div className="text-right">
-              <p className="text-yellow-900 text-sm font-medium">Pending</p>
-              <p className="text-2xl font-bold text-orange-700">{totalPendingBet} 🪙</p>
-            </div>
-          )}
-          <div className="text-right">
-            <p className="text-yellow-900 text-sm font-medium">After Bet</p>
-            <p className={`text-2xl font-bold ${remainingChips < 0 ? 'text-red-600' : 'text-white'}`}>
-              {remainingChips} 🪙
-            </p>
-          </div>
-        </div>
-      </article>
-
       {error && (
         <div className="rounded-lg bg-red-100 border border-red-300 p-3 text-red-700 text-sm">
           ⚠️ {error}
         </div>
       )}
 
-      {/* Answer Tiles Grid */}
-      <div>
-        <h3 className="text-blue-900 font-bold text-lg mb-3">🎯 Place Bets</h3>
-        <p className="text-blue-900/60 text-sm mb-4">
-          Click on each number to bet. Chips are multiplied by the multiplier
-        </p>
-        
-         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {/* Wager Table - Snooker Style */}
+      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-4 sm:p-6 shadow-2xl">
+        <div className="flex flex-col-reverse md:flex-row gap-3 md:gap-4 items-stretch justify-center">
           {answerTiles.map((tile, index) => {
             const pendingBet = pendingBets[index] || 0;
             const placedBet = myPlacedBets.find(b => b.tileIndex === index)?.amount || 0;
@@ -219,42 +139,32 @@ const WagerPhase = ({
             return (
               <article
                 key={index}
-                className={`rounded-xl border-2 p-4 transition-all ${
+                className={`flex-1 min-h-[250px] md:min-h-[300px] lg:min-h-[350px] rounded-2xl border-4 border-white/90 p-3 sm:p-4 transition-all flex flex-col justify-between ${
                   isSelectedByZeroChip
-                    ? 'border-purple-500 bg-purple-50 shadow-xl scale-105 ring-2 ring-purple-300'
+                    ? 'bg-gradient-to-b from-purple-500 to-purple-600 shadow-2xl scale-105 ring-4 ring-purple-300'
                     : placedBet > 0
-                    ? 'border-green-500 bg-green-50 shadow-lg scale-105'
+                    ? 'bg-gradient-to-b from-green-500 to-green-600 shadow-2xl scale-105'
                     : pendingBet > 0
-                    ? 'border-orange-400 bg-orange-50 shadow-md'
+                    ? 'bg-gradient-to-b from-orange-400 to-orange-500 shadow-xl'
                     : isZeroChipPlayer && !hasSelectedTile
-                    ? 'border-purple-300 bg-white hover:border-purple-500 hover:shadow-lg cursor-pointer'
-                    : 'border-blue-200 bg-white hover:border-blue-400 hover:shadow-md'
+                    ? 'bg-gradient-to-b from-green-600 to-green-700 hover:from-purple-600 hover:to-purple-700 hover:shadow-2xl cursor-pointer'
+                    : 'bg-gradient-to-b from-green-600 to-green-700 hover:shadow-xl'
                 }`}
                 onClick={() => isZeroChipPlayer && !hasSelectedTile && handleZeroChipTileSelect(index)}
               >
-                {/* Multiplier Badge */}
+                {/* Multiplier Badge - Top */}
                 <div className="flex justify-between items-start mb-2">
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-bold ${
-                    tile.multiplier >= 5 ? 'bg-purple-500 text-white' :
-                    tile.multiplier >= 4 ? 'bg-red-500 text-white' :
-                    tile.multiplier >= 3 ? 'bg-orange-500 text-white' :
-                    'bg-blue-500 text-white'
-                  }`}>
+                  <span className="inline-block px-3 py-1 rounded-full text-sm sm:text-base font-black bg-white/90 text-black shadow-lg">
                     ×{tile.multiplier}
                   </span>
                   <div className="text-right">
                     {isSelectedByZeroChip && (
-                      <span className="block text-purple-600 text-xs font-semibold">
+                      <span className="block text-white text-xs font-bold bg-purple-500/80 rounded-full px-2 py-1">
                         🎁 Selected
                       </span>
                     )}
-                    {placedBet > 0 && !isSelectedByZeroChip && (
-                      <span className="block text-green-600 text-xs font-semibold">
-                        ✅ Placed {placedBet} 🪙
-                      </span>
-                    )}
                     {totalBetOnTile > 0 && !isSelectedByZeroChip && (
-                      <span className="block text-blue-600 text-xs font-semibold">
+                      <span className="block text-white text-xs font-bold bg-black/40 rounded-full px-2 py-1">
                         → {potentialWin} 🪙
                       </span>
                     )}
@@ -262,23 +172,23 @@ const WagerPhase = ({
                 </div>
 
                 {/* Answer Display */}
-                <div className="mb-3">
+                <div className="mb-3 flex-1 flex flex-col items-center justify-center">
                   {tile.isSmallerTile ? (
                     <div className="text-center">
-                      <p className="text-lg font-bold text-purple-700">
-                        น้อยกว่าทั้งหมด
+                      <p className="text-xl sm:text-2xl font-bold text-white">
+                        SMALLER
                       </p>
-                      <p className="text-xs text-purple-600">
-                        Smaller than smallest
+                      <p className="text-sm text-white/80 mt-2">
+                        Than all guesses
                       </p>
                     </div>
                   ) : (
                     <>
-                      <p className="text-3xl font-bold text-blue-900 text-center mb-1">
+                      <p className="text-4xl sm:text-5xl lg:text-6xl font-black text-white text-center mb-2">
                         {tile.guess}
                       </p>
                       {tile.playerIds && tile.playerIds.length > 0 && (
-                        <div className="text-xs text-blue-600 text-center">
+                        <div className="text-xs text-white/70 text-center mt-1">
                           {tile.playerIds.map(pid => getPlayerName(pid)).join(", ")}
                         </div>
                       )}
@@ -290,8 +200,8 @@ const WagerPhase = ({
                 {!isHost && !isZeroChipPlayer && (
                   <div>
                     {placedBet > 0 && (
-                      <div className="mb-2 text-center text-xs text-green-700 font-semibold">
-                        Already bet {placedBet} chips on this tile
+                      <div className="mb-2 text-center text-xs text-white font-semibold bg-black/30 rounded-full px-2 py-1">
+                        ✅ Bet: {placedBet} chips
                       </div>
                     )}
                     <label htmlFor={`bet-${index}`} className="sr-only">
@@ -305,7 +215,7 @@ const WagerPhase = ({
                       value={pendingBet || ""}
                       onChange={(e) => handleBetChange(index, e.target.value)}
                       placeholder="0"
-                      className="w-full rounded-lg border border-blue-300 px-3 py-2 text-center text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full rounded-lg border-2 border-white/50 bg-white/90 px-3 py-2 text-center text-lg font-bold text-black focus:ring-2 focus:ring-yellow-400 focus:outline-none focus:bg-white"
                     />
                   </div>
                 )}
@@ -313,7 +223,7 @@ const WagerPhase = ({
                 {/* Zero-Chip Player: Click to select */}
                 {!isHost && isZeroChipPlayer && !hasSelectedTile && (
                   <div className="text-center py-2">
-                    <div className="text-purple-600 text-sm font-semibold">
+                    <div className="text-white text-sm font-bold bg-purple-500/80 rounded-full px-3 py-1">
                       👆 Click to select
                     </div>
                   </div>
@@ -321,7 +231,7 @@ const WagerPhase = ({
                 
                 {!isHost && isSelectedByZeroChip && (
                   <div className="text-center py-2">
-                    <div className="text-purple-600 text-sm font-bold">
+                    <div className="text-white text-sm font-bold">
                       ✅ You selected this tile
                     </div>
                   </div>
@@ -332,86 +242,144 @@ const WagerPhase = ({
         </div>
       </div>
 
-      {/* Confirmation Status */}
-      <article className="rounded-xl bg-blue-50 border border-blue-200 p-4">
-        <h3 className="text-blue-900 font-bold text-sm mb-3">📊 Confirmation Status</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-          {players.map((player) => {
-            const confirmed = confirmedWagers?.includes(player.id) || false;
-            return (
-              <div
-                key={player.id}
-                className={`rounded-lg px-3 py-2 text-xs font-semibold text-center ${
-                  confirmed
-                    ? 'bg-green-100 text-green-700 border border-green-300'
-                    : 'bg-gray-100 text-gray-500 border border-gray-300'
-                }`}
-              >
-                <div>{player.name}</div>
-                <div className="mt-1">{confirmed ? '✅' : '⏳'}</div>
+      {/* Action Zone (Yellow Theme) */}
+      <div className="rounded-xl bg-gradient-to-br from-yellow-100 to-yellow-50 border-2 border-yellow-300 shadow-xl overflow-hidden mt-4">
+        <div className="p-6 bg-gradient-to-r from-yellow-200 to-yellow-100 space-y-4">
+          {!isHost && (
+            <>
+              {/* Special Chance Info (for zero-chip players) */}
+            {isZeroChipPlayer && !hasConfirmed && (
+              <div className="text-center py-3 border-t border-b border-purple-300">
+                <h4 className="text-purple-900 font-bold text-sm mb-2">
+                  {hasSelectedTile ? 'Tile Selected' : 'Special Chance'}
+                </h4>
+                {hasSelectedTile && myZeroChipBet ? (
+                  <div className="space-y-1">
+                    <p className="text-purple-800 font-semibold text-sm">
+                      You selected: <span className="font-black">{myZeroChipBet.tileIndex === 0 ? 'Smaller than all' : answerTiles[myZeroChipBet.tileIndex]?.guess}</span>
+                    </p>
+                    <p className="text-purple-700 text-xs">
+                      {allPlayersZeroChip 
+                        ? 'If correct → Get 250 chips'
+                        : 'If correct → Get 25% of max prize'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    <p className="text-purple-800 text-sm">
+                      Out of chips? Click a tile above
+                    </p>
+                    <p className="text-purple-700 text-xs">
+                      {allPlayersZeroChip 
+                        ? 'If correct → Get 250 chips'
+                        : 'If correct → Get 25% of max prize'
+                      }
+                    </p>
+                  </div>
+                )}
               </div>
-            );
-          })}
-        </div>
-        <div className="mt-3 text-center text-sm font-semibold text-blue-700">
-          {confirmedCount}/{totalPlayers} Confirmed
-        </div>
-      </article>
+            )}
 
-      {/* Action Buttons */}
-      {!isHost && (
-        <>
-          {/* Place Pending Bets Button (for normal players) */}
-          {!isZeroChipPlayer && totalPendingBet > 0 && !hasConfirmed && remainingChips >= 0 && (
-            <button
-              type="button"
-              onClick={handlePlaceBets}
-              className="w-full rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold px-6 py-4 shadow-lg transition transform hover:scale-105"
-            >
-              📍 Place Bets ({totalPendingBet} chips)
-            </button>
-          )}
+            {/* Chips Info Display (for non-zero-chip players) */}
+            {!isZeroChipPlayer && !hasConfirmed && (
+              <div className="flex items-center justify-center gap-15 text-center">
+                {/* Current Chips */}
+                <div>
+                  <p className="text-blue-600 text-sm font-semibold mb-1">💰 Current</p>
+                  <p className="text-blue-900 text-3xl font-black">{myChips}</p>
+                </div>
+                
+                {/* Pending Bets */}
+                <div>
+                  <p className="text-orange-600 text-sm font-semibold mb-1">⏳ Pending</p>
+                  <p className="text-orange-900 text-3xl font-black">{totalPendingBet}</p>
+                </div>
+                
+                {/* Remaining */}
+                <div>
+                  <p className={`text-sm font-semibold mb-1 ${
+                    remainingChips < 0 ? 'text-red-600' : 'text-purple-600'
+                  }`}>
+                    {remainingChips < 0 ? '⚠️ Over!' : '🎯 Remaining'}
+                  </p>
+                  <p className={`text-3xl font-black ${
+                    remainingChips < 0 ? 'text-red-900' : 'text-purple-900'
+                  }`}>
+                    {remainingChips}
+                  </p>
+                </div>
+              </div>
+            )}
 
-          {/* Confirm Wagers Button */}
-          {!hasConfirmed ? (
-            isZeroChipPlayer && !hasSelectedTile ? (
+            {/* Header (for non-zero-chip players only) */}
+            {!hasConfirmed && !isZeroChipPlayer && (
+              <div className="text-center">
+                <h3 className="text-xl font-bold text-yellow-900 mb-1">
+                  🎲 Place Your Bets
+                </h3>
+                <p className="text-yellow-700 text-sm">
+                  Enter bet amounts in the tiles above, then place your bets!
+                </p>
+              </div>
+            )}
+
+            {/* Place Pending Bets Button (for normal players) */}
+            {!isZeroChipPlayer && totalPendingBet > 0 && !hasConfirmed && remainingChips >= 0 && (
               <button
                 type="button"
-                disabled
-                className="w-full rounded-xl bg-gray-400 text-white font-bold px-6 py-4 shadow-lg cursor-not-allowed opacity-50"
+                onClick={handlePlaceBets}
+                className="w-full rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-bold text-base px-6 py-3 shadow-md transition"
               >
-                ⚠️ Select a tile before confirming
+                Place Bets ({totalPendingBet} chips)
               </button>
+            )}
+
+            {/* Confirm Wagers Button */}
+            {!hasConfirmed ? (
+              isZeroChipPlayer && !hasSelectedTile ? (
+                <button
+                  type="button"
+                  disabled
+                  className="w-full rounded-xl bg-gray-400 text-white font-bold text-base px-6 py-3 shadow-md cursor-not-allowed opacity-60"
+                >
+                  Select a tile first
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConfirmWagers}
+                  className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base px-6 py-3 shadow-md transition"
+                >
+                  {totalPlacedBet > 0 && !isZeroChipPlayer 
+                    ? `Confirm Wagers (${totalPlacedBet} chips)` 
+                    : 'Confirm Wagers'
+                  }
+                </button>
+              )
             ) : (
-              <button
-                type="button"
-                onClick={handleConfirmWagers}
-                className="w-full rounded-xl bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-4 shadow-lg transition transform hover:scale-105"
-              >
-                ✅ Confirm Wagers
-                {isZeroChipPlayer 
-                  ? ' (Tile Selected)' 
-                  : totalPlacedBet > 0 
-                  ? ` (Placed ${totalPlacedBet} chips)` 
-                  : ''}
-              </button>
-            )
-          ) : (
-            <div className="w-full rounded-xl bg-green-100 border-2 border-green-500 text-green-700 font-bold px-6 py-4 text-center">
-              ✅ You confirmed - Waiting for others ({confirmedCount}/{totalPlayers})
+              <div className="text-center py-3">
+                <h3 className="text-yellow-900 text-base font-bold mb-2">Confirmed</h3>
+                <p className="text-yellow-700 text-sm">
+                  Waiting for others... ({confirmedCount}/{totalPlayers})
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+          {/* Host Message */}
+          {isHost && (
+            <div className="text-center py-3">
+              <h3 className="text-yellow-900 text-base font-bold mb-2">Host View</h3>
+              <p className="text-yellow-700 text-sm mb-2">Waiting for players to confirm wagers...</p>
+              <p className="text-yellow-900 font-bold text-sm">
+                {confirmedCount}/{totalPlayers} confirmed
+              </p>
             </div>
           )}
-        </>
-      )}
-
-      {/* Host Message */}
-      {isHost && (
-        <div className="text-center py-4 bg-purple-100 rounded-xl border border-purple-300">
-          <p className="text-purple-900 font-semibold">
-            👑 You are Host - Waiting for players to confirm wagers ({confirmedCount}/{totalPlayers})
-          </p>
         </div>
-      )}
+      </div>
     </div>
   );
 };

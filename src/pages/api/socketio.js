@@ -77,6 +77,7 @@ export default function handler(req, res) {
           
           // Send current players list to the host
           socket.emit("playersUpdate", room.players);
+          socket.emit("chipsUpdate", room.chips); // Send chips to host too
           return;
         }
 
@@ -104,6 +105,7 @@ export default function handler(req, res) {
           io.to(roomId).emit("playersUpdate", updatedRoom.players);
           io.to(roomId).emit("roomUpdate", updatedRoom);
           io.to(roomId).emit("answersUpdate", updatedRoom.answers);
+          io.to(roomId).emit("chipsUpdate", updatedRoom.chips); // Send initial chips when player joins!
         }
       });
 
