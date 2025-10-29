@@ -4,6 +4,7 @@ import { getSocket } from "@/lib/socketManager";
 import questionsData from "@/lib/questions.json";
 import ConfirmModal from "@/components/ConfirmModal";
 import Snackbar from "@/components/Snackbar";
+import QRCode from "qrcode";
 
 const LobbyPage = () => {
   const router = useRouter();
@@ -31,6 +32,27 @@ const LobbyPage = () => {
   const [showNameAlert, setShowNameAlert] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [snackbar, setSnackbar] = useState({ isOpen: false, message: "", type: "info" });
+
+  // Generate QR code when room ID is available
+  useEffect(() => {
+    if (id && typeof window !== 'undefined') {
+      const roomUrl = `${window.location.origin}/room/${id}/lobby`;
+      QRCode.toDataURL(roomUrl, {
+        width: 300,
+        margin: 1,
+        color: {
+          dark: '#000000',  // Black pattern (default)
+          light: '#FFFFFF'  // White background (default)
+        }
+      }).then(url => {
+        setQrCodeUrl(url);
+      }).catch(err => {
+        console.error('QR Code generation error:', err);
+      });
+    }
+  }, [id]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -235,6 +257,14 @@ const LobbyPage = () => {
 
       s.on("error", (error) => {
         console.error("[Lobby] Socket error:", error);
+        // Show error message to user
+        if (error.message) {
+          showSnackbar(error.message, "error");
+          // If join failed, redirect to home
+          if (error.message.includes("Cannot join") || error.message.includes("Room is full")) {
+            setTimeout(() => router.push("/"), 2000); // Delay redirect to show snackbar
+          }
+        }
       });
 
       s.on("disconnect", (reason) => {
@@ -331,6 +361,15 @@ const LobbyPage = () => {
     }
   };
 
+  // Snackbar helpers
+  const showSnackbar = (message, type = "info") => {
+    setSnackbar({ isOpen: true, message, type });
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar({ isOpen: false, message: "", type: "info" });
+  };
+
   // Toggle category selection
   const toggleCategory = (category) => {
     setSelectedCategories(prev => {
@@ -350,6 +389,18 @@ const LobbyPage = () => {
   // Start Game function for host
   const startGame = () => {
     if (!socketRef.current) return;
+    
+    // Validate player count (1-7 players, not including host)
+    const playerCount = players.length;
+    if (playerCount < 1) {
+      showSnackbar("Need at least 1 player to start the game!", "warning");
+      return;
+    }
+    if (playerCount > 7) {
+      showSnackbar("Maximum 7 players allowed!", "warning");
+      return;
+    }
+    
     socketRef.current.emit("startGame", { roomId: id, categories: selectedCategories });
   };
 
@@ -526,14 +577,30 @@ const LobbyPage = () => {
             </div>
           ) : (
             <>
-              {/* 1. Game PIN - Room Code at Top */}
-              <div className="bg-black/90 text-white py-8 text-center">
-                <p className="text-sm font-medium uppercase tracking-wider mb-2 opacity-90">
-                  Game PIN
-                </p>
-                <p className="text-7xl font-black tracking-wider">
-                  {id}
-                </p>
+              {/* 1. QR Code + Game PIN at Top */}
+              <div className="bg-black/90 text-white py-8">
+                <div className="max-w-4xl mx-auto px-4 flex flex-col md:flex-row items-center justify-center gap-6">
+                  {/* QR Code - Left side */}
+                  {qrCodeUrl && (
+                    <div className="flex items-center">
+                      <img 
+                        src={qrCodeUrl} 
+                        alt="QR Code to join room" 
+                        className="w-28 h-28 md:w-32 md:h-32"
+                      />
+                    </div>
+                  )}
+                  
+                  {/* Game PIN - Right side, text aligned left */}
+                  <div className="text-start">
+                    <p className="text-sm font-medium uppercase tracking-wider mb-2 opacity-90">
+                      Game PIN
+                    </p>
+                    <p className="text-7xl font-black tracking-wider">
+                      {id}
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="p-8">
@@ -552,31 +619,33 @@ const LobbyPage = () => {
                   </div>
                 </div>
 
-                {/* Players Count และ ปุ่ม */}
-                <div className="w-full flex items-center justify-between mb-6">
-                  {/* ซ้าย: จำนวน Players */}
-                  <div className="flex items-center gap-2">
-                    <svg className="w-7 h-7 text-black" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                    </svg>
-                    <span className="text-3xl font-bold text-black">{players.length}</span>
-                    <span className="text-black text-lg">Players</span>
-                  </div>
+                {/* Players Count และ Action Buttons */}
+                <div className="w-full mb-6">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                    {/* จำนวน Players */}
+                    <div className="flex items-center gap-2">
+                      <svg className="w-7 h-7 text-black" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                      </svg>
+                      <span className="text-3xl font-bold text-black">{players.length}</span>
+                      <span className="text-black text-lg">Players</span>
+                    </div>
 
-                  {/* ขวา: Category Dropdown + ปุ่ม Start และ Delete (Host) หรือ Leave (Player) */}
-                  {isHost ? (
-                    <div className="flex gap-3 items-center" ref={dropdownRef}>
+                    {/* Action Buttons */}
+                    {isHost ? (
+                      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center" ref={dropdownRef}>
                       {/* Category Dropdown (Host Only) */}
                       <div className="relative">
                         <button
                           type="button"
                           onClick={() => setDropdownOpen(!dropdownOpen)}
-                          className="rounded-xl border-2 border-yellow-400 bg-white px-4 py-4 text-black font-bold hover:bg-yellow-50 transition shadow-lg flex items-center gap-2"
+                          className="w-full sm:w-auto rounded-xl border-2 border-yellow-400 bg-white px-4 py-3 text-black font-bold hover:bg-yellow-50 transition shadow-lg flex items-center justify-center gap-2"
                           title="Select Categories"
                         >
                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                           </svg>
+                          <span className="sm:hidden">Categories</span>
                           <svg className={`w-4 h-4 transition-transform ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                           </svg>
@@ -584,7 +653,7 @@ const LobbyPage = () => {
 
                         {/* Dropdown Menu */}
                         {dropdownOpen && (
-                          <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg border-2 border-yellow-400 shadow-xl z-50">
+                          <div className="absolute left-0 sm:right-0 mt-2 w-full sm:w-56 bg-white rounded-lg border-2 border-yellow-400 shadow-xl z-50">
                             <div className="p-2">
                               {availableCategories.map(category => (
                                 <label
@@ -610,7 +679,7 @@ const LobbyPage = () => {
                       <button
                         type="button"
                         onClick={() => setShowDeleteConfirm(true)}
-                        className="rounded-xl bg-black/90 hover:bg-red-600 text-white font-bold px-6 py-4 text-lg transition shadow-lg transform hover:scale-105"
+                        className="rounded-xl bg-black/90 hover:bg-red-600 text-white font-bold px-6 py-3 text-base transition shadow-lg"
                         title="Delete Room"
                       >
                         Delete Room
@@ -618,20 +687,21 @@ const LobbyPage = () => {
                       <button
                         type="button"
                         onClick={startGame}
-                        className="rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold px-10 py-4 text-lg transition shadow-lg transform hover:scale-105"
+                        className="rounded-xl bg-blue-700 hover:bg-blue-800 text-white font-bold px-8 py-3 text-base transition shadow-lg"
                       >
-                        Start
+                        Start Game
                       </button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowLeaveConfirm(true)}
-                      className="rounded-xl bg-black/90 hover:bg-red-500 text-white font-semibold px-6 py-3 transition shadow-lg"
-                    >
-                      Leave
-                    </button>
-                  )}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowLeaveConfirm(true)}
+                        className="w-full sm:w-auto rounded-xl bg-black/90 hover:bg-red-500 text-white font-semibold px-6 py-3 transition shadow-lg"
+                      >
+                        Leave Room
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* 3. Player Names - flex row */}
@@ -685,6 +755,14 @@ const LobbyPage = () => {
           animation: sunburst-rotate 60s linear infinite;
         }
       `}</style>
+
+      <Snackbar
+        isOpen={snackbar.isOpen}
+        onClose={closeSnackbar}
+        message={snackbar.message}
+        type={snackbar.type}
+        duration={3000}
+      />
     </div>
     </>
   );

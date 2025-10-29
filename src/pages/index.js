@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
 import SiteFooter from "@/components/SiteFooter";
+import Snackbar from "@/components/Snackbar";
 
 export default function HomePage() {
   const router = useRouter();
   const [createdRoomId, setCreatedRoomId] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
   const [hostId, setHostId] = useState("");
+  const [snackbar, setSnackbar] = useState({ isOpen: false, message: "", type: "info" });
 
   const createRoom = () => {
     const id = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -21,10 +23,22 @@ export default function HomePage() {
     router.push(`/room/${createdRoomId}/lobby?host=true&hostId=${hostId}`);
   };
 
+  const showSnackbar = (message, type = "info") => {
+    setSnackbar({ isOpen: true, message, type });
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar({ isOpen: false, message: "", type: "info" });
+  };
+
   const joinRoom = () => {
     const trimmed = joinRoomId.trim().toUpperCase();
-    if (!trimmed) return;
-    // Don't emit joinRoom here - let the player enter their name in the lobby page first
+    if (!trimmed) {
+      showSnackbar("Please enter a room code", "warning");
+      return;
+    }
+    
+    // Redirect to lobby - validation will happen on server side
     router.push(`/room/${trimmed}/lobby`);
   };
 
@@ -118,6 +132,14 @@ export default function HomePage() {
         </section>
       </header>
       {/* Footer is now rendered globally via _app.js */}
+      
+      <Snackbar
+        isOpen={snackbar.isOpen}
+        onClose={closeSnackbar}
+        message={snackbar.message}
+        type={snackbar.type}
+        duration={3000}
+      />
     </main>
   );
 }
