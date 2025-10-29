@@ -6,6 +6,7 @@ import WagerPhase from "@/components/WagerPhase";
 import PayoutPhase from "@/components/PayoutPhase";
 import HostControls from "@/components/HostControls";
 import Snackbar from "@/components/Snackbar";
+import { Dices, Wallet, Target, Coins, Gamepad2, Gem } from "lucide-react";
 
 export default function RoomPage() {
   const router = useRouter();
@@ -403,10 +404,11 @@ export default function RoomPage() {
           aria-hidden
           className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_50%_50%,#fde047_0%,#facc15_35%,#eab308_60%,#ca8a04_100%)] [mask-image:radial-gradient(circle_at_50%_50%,rgba(0,0,0,1)_0%,rgba(0,0,0,0.85)_35%,rgba(0,0,0,0.6)_60%,rgba(0,0,0,0.25)_100%)]"
         />
+        
 
       {/* No header needed - Room PIN in sidebar */}
 
-      <section className="relative z-10 flex-1 flex flex-col md:flex-row gap-0">
+      <section className="relative flex-1 flex flex-col md:flex-row gap-0">
         {/* Game Phases Only - Lobby is in separate page */}
         {phase !== "lobby" && (
           <>
@@ -419,6 +421,19 @@ export default function RoomPage() {
                   <p className="text-xs uppercase tracking-wider text-white/60 mb-1">Room PIN</p>
                   <p className="text-3xl font-black tracking-wider">{id}</p>
                 </div>
+
+                {/* Host Controls - Desktop */}
+                {isHost && (
+                  <HostControls 
+                    roomId={id}
+                    phase={phase}
+                    currentRound={currentRound}
+                    totalRounds={totalRounds}
+                    socket={socketRef.current}
+                    isHost={isHost}
+                    hostId={hostId}
+                  />
+                )}
 
                 {/* Scoreboard */}
                 <div>
@@ -505,7 +520,7 @@ export default function RoomPage() {
               </div>
 
               {/* Mobile Navbar + Hamburger (Sticky) */}
-              <div className="md:hidden sticky top-0 z-50 bg-black border-b border-white/20 p-4">
+              <div className="md:hidden sticky top-0 z-30 bg-black border-b border-white/20 p-4">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-wider text-white/60">Room PIN</p>
@@ -611,24 +626,26 @@ export default function RoomPage() {
             </aside>
 
             {/* Main Content Area - Right (Green) */}
-            <div className="flex-1 flex flex-col bg-green-600 overflow-auto">
-              {/* Host Controls - Desktop Only */}
-              {isHost && (
-                <div className="hidden md:block">
-                  <HostControls 
-                    roomId={id}
-                    phase={phase}
-                    currentRound={currentRound}
-                    totalRounds={totalRounds}
-                    socket={socketRef.current}
-                    isHost={isHost}
-                    hostId={hostId}
+            <div className="flex-1 flex flex-col overflow-auto relative">
+              {/* Green radial gradient background - dark center to light edges */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_50%_50%,#14532d_0%,#166534_35%,#15803d_60%,#16a34a_100%)]"
+              />
+              
+              {/* Animated dark green sunburst pattern - behind everything */}
+              <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 overflow-hidden"
+              >
+                <div className="absolute left-1/2 top-1/2 w-[200vmax] h-[200vmax] -translate-x-1/2 -translate-y-1/2">
+                  <div
+                    className="sunburst-rotate-slow w-full h-full [background:repeating-conic-gradient(from_0deg_at_50%_50%,rgba(5,30,15,0.35)_0deg,rgba(5,30,15,0.35)_12deg,rgba(5,30,15,0)_12deg,rgba(5,30,15,0)_28deg)]"
                   />
                 </div>
-              )}
-
+              </div>
               {/* Main Game Area */}
-              <div className="flex-1 p-4">
+              <div className="flex-1 p-4 relative">
                 {isRejoining && (
                   <div className="text-center py-8">
                     <div className="text-5xl mb-4">🔄</div>
@@ -688,18 +705,33 @@ export default function RoomPage() {
                     />
                     
                     {/* 2. Wits & Wagers Placeholder - Middle */}
-                    <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-6 shadow-2xl mb-4">
-                      <div className="flex items-center justify-center min-h-[120px]">
-                        <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white/50 text-center tracking-tight zoom-pulse" style={{ fontFamily: 'Georgia, serif' }}>
-                          Wits &<br />Wagers
-                        </h2>
+                    <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-6 shadow-2xl mb-6 flex items-center justify-center">
+                      {/* Container with max-width for desktop to keep icons closer */}
+                      <div className="relative w-full max-w-4xl">
+                        {/* Decorative Floating Icons */}
+                        <div className="absolute inset-0 pointer-events-none">
+                          <Dices className="absolute top-2 left-2 lg:top-8 lg:left-4 w-8 h-8 lg:w-10 lg:h-10 text-white/50 animate-float-slow zoom-pulse" />
+                          <Wallet className="absolute top-2 right-2 lg:top-8 lg:right-4 w-7 h-7 lg:w-9 lg:h-9 text-white/50 animate-float-slower zoom-pulse" style={{ animationDelay: '0.5s' }} />
+                          <Target className="absolute bottom-2 left-6 lg:bottom-8 lg:left-20 w-7 h-7 lg:w-9 lg:h-9 text-white/50 animate-float-slow zoom-pulse" style={{ animationDelay: '1s' }} />
+                          <Coins className="absolute bottom-2 right-2 lg:bottom-8 lg:right-20 w-8 h-8 lg:w-10 lg:h-10 text-white/50 animate-float-slower zoom-pulse" style={{ animationDelay: '1.5s' }} />
+                          <Gamepad2 className="absolute top-1/2 -translate-y-1/2 left-0 lg:left-40 w-6 h-6 lg:w-7 lg:h-7 text-white/50 animate-float-slow zoom-pulse" style={{ animationDelay: '0.8s' }} />
+                          <Gem className="absolute top-1/2 -translate-y-1/2 right-0 lg:right-40 w-6 h-6 lg:w-7 lg:h-7 text-white/50 animate-float-slower zoom-pulse" style={{ animationDelay: '1.2s' }} />
+                        </div>
+                        
+                        <div className="flex items-center justify-center min-h-[120px] relative">
+                          {/* Mobile/Tablet: 2 lines, Desktop: 1 line */}
+                          <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-white/50 text-center tracking-tight zoom-pulse" style={{ fontFamily: 'Georgia, serif' }}>
+                            <span className="lg:hidden">Wits &<br />Wagers</span>
+                            <span className="hidden lg:inline">Wits & Wagers</span>
+                          </h2>
+                        </div>
                       </div>
                     </div>
 
                     {/* 3. Action Zone (Yellow Theme) - Bottom */}
-                    <div className="rounded-xl bg-gradient-to-br from-yellow-100 to-yellow-50 border-2 border-yellow-300 shadow-xl overflow-hidden">
+                    <div className="rounded-xl bg-yellow-100 shadow-xl overflow-hidden">
                       {!isHost && !hasSubmitted ? (
-                        <div className="p-6 bg-gradient-to-r from-yellow-200 to-yellow-100">
+                        <div className="p-6">
                           <div className="mb-3 text-center">
                             <h3 className="text-xl font-bold text-yellow-900 mb-1">💭 Submit Your Answer</h3>
                             <p className="text-yellow-700 text-sm">Enter a number - your best guess!</p>
@@ -754,7 +786,7 @@ export default function RoomPage() {
 
                     {/* Show answer tiles if available (same as wager phase but read-only) */}
                     {roundResult.winner && answerTiles && answerTiles.length > 0 && (
-                      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-4 sm:p-6 shadow-2xl">
+                      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-4 sm:p-6 shadow-2xl mb-6">
                         <div className="flex flex-col-reverse md:flex-row gap-3 md:gap-4 items-stretch justify-center">
                           {answerTiles.map((tile, index) => {
                             const isWinningTile = (tile.isSmallerTile && roundResult.winner.isSmallerTile) || 
@@ -812,7 +844,7 @@ export default function RoomPage() {
                     )}
 
                     {!roundResult.winner && (
-                      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-6 shadow-2xl">
+                      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-6 shadow-2xl mb-6">
                         <div className="flex items-center justify-center min-h-[120px]">
                           <p className="text-2xl font-bold text-white text-center">
                             ❌ No winner - all guesses exceeded the answer!
@@ -822,8 +854,8 @@ export default function RoomPage() {
                     )}
 
                     {/* Action Zone */}
-                    <div className="rounded-xl bg-gradient-to-br from-yellow-100 to-yellow-50 border-2 border-yellow-300 shadow-xl overflow-hidden mt-4">
-                      <div className="p-6 bg-gradient-to-r from-yellow-200 to-yellow-100">
+                    <div className="rounded-xl bg-yellow-100 shadow-xl overflow-hidden mt-4">
+                      <div className="p-6">
                         <div className="text-center">
                           <h3 className="text-yellow-900 text-lg font-bold mb-2">Get Ready</h3>
                           <p className="text-yellow-700 text-sm">Next round starting soon...</p>
@@ -884,8 +916,8 @@ export default function RoomPage() {
                     />
 
                     {/* Action Zone with Payout Result */}
-                    <div className="rounded-xl bg-gradient-to-br from-yellow-100 to-yellow-50 border-2 border-yellow-300 shadow-xl overflow-hidden mt-4">
-                      <div className="p-6 bg-gradient-to-r from-yellow-200 to-yellow-100 space-y-3">
+                    <div className="rounded-xl bg-yellow-100 shadow-xl overflow-hidden">
+                      <div className="p-6 space-y-3">
                         {/* My Payout Result */}
                         {!isHost && (() => {
                         const myPayout = payoutResult.payouts[clientIdRef.current];
@@ -955,7 +987,7 @@ export default function RoomPage() {
                 {/* Finished Phase */}
                 {phase === "finished" && (
                   <>
-                    <div className="text-center py-16">
+                    <div className="text-center py-16 mb-6">
                       <div className="text-8xl mb-6">🏆</div>
                       <h2 className="text-4xl font-bold text-white mb-4">Game Finished!</h2>
                       <p className="text-white/90 text-xl mb-6">Check the leaderboard on the side</p>
@@ -963,8 +995,8 @@ export default function RoomPage() {
                     </div>
 
                     {/* Action Zone */}
-                    <div className="rounded-xl bg-gradient-to-br from-yellow-100 to-yellow-50 border-2 border-yellow-300 shadow-xl overflow-hidden mt-4">
-                      <div className="p-6 bg-gradient-to-r from-yellow-200 to-yellow-100">
+                    <div className="rounded-xl bg-yellow-100 shadow-xl overflow-hidden">
+                      <div className="p-6">
                         <div className="text-center">
                           <h3 className="text-yellow-900 text-xl font-bold mb-3">Thanks for Playing</h3>
                           <p className="text-yellow-700 text-base font-semibold mb-2">
