@@ -18,9 +18,9 @@ const PayoutPhase = ({
   const myChips = chips[myPlayerId] || 0;
 
   return (
-    <div className="space-y-6">
+    <div>
       {/* Wager Table with Winning Tile Highlighted */}
-      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-4 sm:p-6 shadow-2xl">
+      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-4 sm:p-6 shadow-2xl mb-6">
         <div className="flex flex-col-reverse md:flex-row gap-3 md:gap-4 items-stretch justify-center">
           {answerTiles.map((tile, index) => {
             const isWinningTile = (tile.isSmallerTile && winningTile.isSmallerTile) || 

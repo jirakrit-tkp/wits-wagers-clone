@@ -49,14 +49,60 @@ body {
   }
 }
 
+/* Animated stripes - left to right (desktop) */
+@keyframes stripes-horizontal {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 100px 0;
+  }
+}
+
+/* Animated stripes - bottom to top (mobile) */
+@keyframes stripes-vertical {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 -100px;
+  }
+}
+
+/* Float animation for decorative icons */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  33% {
+    transform: translateY(-10px) translateX(5px);
+  }
+  66% {
+    transform: translateY(-5px) translateX(-5px);
+  }
+}
+
 @layer utilities {
   .sunburst-rotate { /* fallback util for animation */
     animation: sunburst-rotate 12s linear infinite;
     transform-origin: 50% 50%;
   }
 
+  .sunburst-rotate-slow {
+    animation: sunburst-rotate 60s linear infinite;
+    transform-origin: 50% 50%;
+  }
+
   .zoom-pulse {
     animation: zoom-pulse 2s ease-in-out infinite;
+  }
+
+  .animate-float-slow {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .animate-float-slower {
+    animation: float 4s ease-in-out infinite;
   }
 
   .animate-slide-up {
@@ -76,5 +122,34 @@ body {
       -0.1em -0.1em 0 #60a5fa, -0.1em 0.1em 0 #60a5fa, 0.1em -0.1em 0 #60a5fa, 0.1em 0.1em 0 #60a5fa,
       -0.16em 0 0 #000, 0.16em 0 0 #000, 0 -0.16em 0 #000, 0 0.16em 0 #000,
       -0.16em -0.16em 0 #000, -0.16em 0.16em 0 #000, 0.16em -0.16em 0 #000, 0.16em 0.16em 0 #000;
+  }
+
+  /* Animated stripes for game room */
+  .animated-stripes {
+    /* Mobile: bottom to top - using darker green on yellow gradient */
+    background: repeating-linear-gradient(
+      0deg,
+      rgba(20, 83, 45, 0.35) 0px,
+      rgba(20, 83, 45, 0.35) 30px,
+      transparent 30px,
+      transparent 60px
+    );
+    background-size: 100% 120px;
+    animation: stripes-vertical 4s linear infinite;
+  }
+
+  /* Desktop: left to right */
+  @media (min-width: 768px) {
+    .animated-stripes {
+      background: repeating-linear-gradient(
+        90deg,
+        rgba(20, 83, 45, 0.35) 0px,
+        rgba(20, 83, 45, 0.35) 30px,
+        transparent 30px,
+        transparent 60px
+      );
+      background-size: 120px 100%;
+      animation: stripes-horizontal 4s linear infinite;
+    }
   }
 }
