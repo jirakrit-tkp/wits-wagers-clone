@@ -407,6 +407,7 @@ const LobbyPage = () => {
   // Delete Room function for host
   const handleDeleteRoom = () => {
     if (!socketRef.current || !isHost || !hostId) return;
+    console.log(`[Lobby] Deleting room: ${id}, hostId: ${hostId}`);
     socketRef.current.emit("deleteRoom", { roomId: id, hostId: hostId });
   };
 
