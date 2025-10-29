@@ -102,6 +102,7 @@ const LobbyPage = () => {
     // If socket already initialized, just rejoin the new room
     if (socketRef.current && socketRef.current.connected) {
       if (savedIsHost && savedHostId) {
+        console.log(`[Lobby] Socket already connected - emitting createRoom: ${id}, hostId: ${savedHostId}`);
         socketRef.current.emit("createRoom", { roomId: id, hostId: savedHostId });
         socketRef.current.emit("joinRoom", { roomId: id, isHost: true, hostId: savedHostId });
         hasJoinedRoomRef.current = true;
@@ -186,6 +187,7 @@ const LobbyPage = () => {
         
         // Auto-create/join for host
         if (savedIsHost && savedHostId) {
+          console.log(`[Lobby] Host rejoining - emitting createRoom: ${id}, hostId: ${savedHostId}`);
           s.emit("createRoom", { roomId: id, hostId: savedHostId });
           s.emit("joinRoom", { roomId: id, isHost: true, hostId: savedHostId });
           hasJoinedRoomRef.current = true;
@@ -305,8 +307,11 @@ const LobbyPage = () => {
       }));
 
       if (socketRef.current?.connected) {
+        console.log(`[Lobby] Host emitting createRoom: ${id}, hostId: ${urlHostId}`);
         socketRef.current.emit("createRoom", { roomId: id, hostId: urlHostId });
         socketRef.current.emit("joinRoom", { roomId: id, isHost: true, hostId: urlHostId });
+      } else {
+        console.log(`[Lobby] ⚠️ Socket not connected, cannot create room ${id}`);
       }
     }
   }, [router.isReady, router.query.host, router.query.hostId, router.query.hostid, id, joined]);
