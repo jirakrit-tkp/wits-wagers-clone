@@ -102,7 +102,25 @@ export default function handler(req, res) {
             }
             console.log(`✅ Player ${player.name} (${player.id}) REJOINED room ${roomId} - NO DUPLICATE ADDED`);
           } else {
-            // New player, add them
+            // New player trying to join
+            
+            // Validation 1: Don't allow join if game already started
+            if (room.phase !== 'lobby') {
+              console.log(`❌ Player ${player.name} tried to join room ${roomId} but game already started (phase: ${room.phase})`);
+              socket.emit("error", { message: "Cannot join - game already started" });
+              socket.leave(roomId); // Remove from room
+              return;
+            }
+            
+            // Validation 2: Don't allow more than 7 players (not including host)
+            if (room.players.length >= 7) {
+              console.log(`❌ Player ${player.name} tried to join room ${roomId} but room is full (7/7 players)`);
+              socket.emit("error", { message: "Room is full (maximum 7 players)" });
+              socket.leave(roomId); // Remove from room
+              return;
+            }
+            
+            // All validations passed, add new player
             addPlayer(roomId, player);
             console.log(`➕ NEW player ${player.name} (${player.id}) added to room ${roomId}. Total players: ${room.players.length}`);
           }

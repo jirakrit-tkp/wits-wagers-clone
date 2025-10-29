@@ -33,6 +33,7 @@ const LobbyPage = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [snackbar, setSnackbar] = useState({ isOpen: false, message: "", type: "info" });
 
   // Generate QR code when room ID is available
   useEffect(() => {
@@ -256,6 +257,14 @@ const LobbyPage = () => {
 
       s.on("error", (error) => {
         console.error("[Lobby] Socket error:", error);
+        // Show error message to user
+        if (error.message) {
+          showSnackbar(error.message, "error");
+          // If join failed, redirect to home
+          if (error.message.includes("Cannot join") || error.message.includes("Room is full")) {
+            setTimeout(() => router.push("/"), 2000); // Delay redirect to show snackbar
+          }
+        }
       });
 
       s.on("disconnect", (reason) => {
@@ -352,6 +361,15 @@ const LobbyPage = () => {
     }
   };
 
+  // Snackbar helpers
+  const showSnackbar = (message, type = "info") => {
+    setSnackbar({ isOpen: true, message, type });
+  };
+
+  const closeSnackbar = () => {
+    setSnackbar({ isOpen: false, message: "", type: "info" });
+  };
+
   // Toggle category selection
   const toggleCategory = (category) => {
     setSelectedCategories(prev => {
@@ -371,6 +389,18 @@ const LobbyPage = () => {
   // Start Game function for host
   const startGame = () => {
     if (!socketRef.current) return;
+    
+    // Validate player count (1-7 players, not including host)
+    const playerCount = players.length;
+    if (playerCount < 1) {
+      showSnackbar("Need at least 1 player to start the game!", "warning");
+      return;
+    }
+    if (playerCount > 7) {
+      showSnackbar("Maximum 7 players allowed!", "warning");
+      return;
+    }
+    
     socketRef.current.emit("startGame", { roomId: id, categories: selectedCategories });
   };
 
@@ -725,6 +755,14 @@ const LobbyPage = () => {
           animation: sunburst-rotate 60s linear infinite;
         }
       `}</style>
+
+      <Snackbar
+        isOpen={snackbar.isOpen}
+        onClose={closeSnackbar}
+        message={snackbar.message}
+        type={snackbar.type}
+        duration={3000}
+      />
     </div>
     </>
   );
