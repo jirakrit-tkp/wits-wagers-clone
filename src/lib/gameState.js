@@ -24,18 +24,26 @@ export function createRoom(roomId, hostId) {
     scores: {}, // Keep for backwards compatibility, but chips are primary now
     selectedCategories: ['general', 'entertainment', 'dirty'], // Category filters for questions
   };
+  console.log(`[gameState] 🏠 Room ${roomId} created. Total rooms: ${Object.keys(rooms).length}`, Object.keys(rooms));
   return rooms[roomId];
 }
 
 export function getRoom(roomId) {
-  return rooms[roomId];
+  const room = rooms[roomId];
+  if (!room) {
+    console.log(`[gameState] ❌ Room ${roomId} NOT FOUND. Available rooms:`, Object.keys(rooms));
+  }
+  return room;
 }
 
 export function deleteRoom(roomId) {
+  console.log(`[gameState] 🗑️ Attempting to delete room ${roomId}. Current rooms:`, Object.keys(rooms));
   if (rooms[roomId]) {
     delete rooms[roomId];
+    console.log(`[gameState] ✅ Room ${roomId} deleted. Remaining rooms:`, Object.keys(rooms));
     return true;
   }
+  console.log(`[gameState] ❌ Room ${roomId} not found for deletion`);
   return false;
 }
 

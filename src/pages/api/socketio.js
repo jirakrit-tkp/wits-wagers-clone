@@ -20,12 +20,12 @@ import {
 
 export default function handler(req, res) {
   if (!res.socket.server.io) {
-    console.log("🚀 Initializing Socket.io server...");
+    console.log(`🚀 Initializing Socket.io server... [PID: ${process.pid}] [WEB_CONCURRENCY: ${process.env.WEB_CONCURRENCY || 'not set'}]`);
     const io = new Server(res.socket.server);
     res.socket.server.io = io;
 
     io.on("connection", (socket) => {
-      console.log(`✅ New socket connected: ${socket.id}`);
+      console.log(`✅ New socket connected: ${socket.id} [PID: ${process.pid}]`);
       socket.on("createRoom", ({ roomId, hostId }) => {
         // Check if room already exists (e.g., when host refreshes)
         let room = getRoom(roomId);
