@@ -34,6 +34,7 @@ const LobbyPage = () => {
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [qrCodeUrl, setQrCodeUrl] = useState("");
   const [snackbar, setSnackbar] = useState({ isOpen: false, message: "", type: "info" });
+  const [socketReady, setSocketReady] = useState(false);
 
   // Generate QR code when room ID is available
   useEffect(() => {
@@ -165,6 +166,8 @@ const LobbyPage = () => {
     // Use singleton socket
     getSocket().then((s) => {
       socketRef.current = s;
+      setSocketReady(true); // Mark socket as ready
+      console.log(`[Lobby] Socket ready!`);
 
       // Remove old listeners first to prevent duplicates
       s.off("connect");
@@ -284,12 +287,12 @@ const LobbyPage = () => {
 
   // Check URL params for host
   useEffect(() => {
-    if (!router.isReady) return;
+    if (!router.isReady || !socketReady) return; // Wait for both router and socket
     
     console.log(`[Lobby] Router query:`, router.query);
     const urlIsHost = router.query.host === "true";
     const urlHostId = router.query.hostId || router.query.hostid; // Support both cases
-    console.log(`[Lobby] URL check - isHost: ${urlIsHost}, hostId: ${urlHostId}`);
+    console.log(`[Lobby] URL check - isHost: ${urlIsHost}, hostId: ${urlHostId}, socketReady: ${socketReady}`);
 
     if (urlIsHost && urlHostId && !joined) {
       clientIdRef.current = urlHostId;
@@ -308,15 +311,45 @@ const LobbyPage = () => {
         roomId: id
       }));
 
-      if (socketRef.current?.connected) {
+      const emitCreateRoom = () => {
+        if (!socketRef.current) return;
         console.log(`[Lobby] Host emitting createRoom: ${id}, hostId: ${urlHostId}`);
         socketRef.current.emit("createRoom", { roomId: id, hostId: urlHostId });
         socketRef.current.emit("joinRoom", { roomId: id, isHost: true, hostId: urlHostId });
+      };
+
+      if (socketRef.current) {
+        if (socketRef.current.connected) {
+          console.log(`[Lobby] Socket already connected, emitting immediately`);
+          emitCreateRoom();
+        } else {
+          console.log(`[Lobby] ⚠️ Socket not connected yet, waiting...`);
+          
+          // Try to connect if not connecting
+          if (!socketRef.current.connecting) {
+            console.log(`[Lobby] Forcing socket connection...`);
+            socketRef.current.connect();
+          }
+          
+          // Wait for socket to connect with timeout
+          const connectTimeout = setTimeout(() => {
+            console.log(`[Lobby] ⚠️ Connect timeout! Trying to emit anyway...`);
+            if (socketRef.current) {
+              emitCreateRoom();
+            }
+          }, 3000);
+          
+          socketRef.current.once("connect", () => {
+            clearTimeout(connectTimeout);
+            console.log(`[Lobby] ✅ Socket connected! Now emitting createRoom: ${id}`);
+            emitCreateRoom();
+          });
+        }
       } else {
-        console.log(`[Lobby] ⚠️ Socket not connected, cannot create room ${id}`);
+        console.log(`[Lobby] ⚠️ Socket is null, cannot create room`);
       }
     }
-  }, [router.isReady, router.query.host, router.query.hostId, router.query.hostid, id, joined]);
+  }, [router.isReady, router.query.host, router.query.hostId, router.query.hostid, id, joined, socketReady]);
 
   // Join Room function for players
   const joinRoom = () => {
