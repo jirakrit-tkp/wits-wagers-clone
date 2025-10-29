@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import ConfirmModal from "./ConfirmModal";
 
 const WagerPhase = ({ 
   answerTiles, 
@@ -16,8 +15,6 @@ const WagerPhase = ({
 }) => {
   const [pendingBets, setPendingBets] = useState({}); // { tileIndex: amount } - before confirm
   const [error, setError] = useState("");
-  const [showZeroChipConfirm, setShowZeroChipConfirm] = useState(false);
-  const [pendingTileSelection, setPendingTileSelection] = useState(null);
   
   const myChips = chips[myPlayerId] || 0;
   const totalPendingBet = Object.values(pendingBets).reduce((sum, amount) => sum + amount, 0);
@@ -106,19 +103,10 @@ const WagerPhase = ({
 
   const handleZeroChipTileSelect = (tileIndex) => {
     if (!isZeroChipPlayer || hasSelectedTile) return;
-    setPendingTileSelection(tileIndex);
-    setShowZeroChipConfirm(true);
-  };
-
-  const confirmZeroChipSelection = () => {
-    if (pendingTileSelection === null) return;
     
-    // Place a zero-chip bet
-    onPlaceBet(pendingTileSelection, 0);
-    console.log(`[WagerPhase] Zero-chip player selected tile ${pendingTileSelection}`);
-    
-    // Reset state
-    setPendingTileSelection(null);
+    // Place a zero-chip bet immediately (no confirmation modal)
+    onPlaceBet(tileIndex, 0);
+    console.log(`[WagerPhase] Zero-chip player selected tile ${tileIndex}`);
   };
 
   const getPlayerName = (playerId) => {
@@ -134,40 +122,8 @@ const WagerPhase = ({
     );
   }
 
-  // Get confirmation message data
-  const getConfirmationMessage = () => {
-    if (pendingTileSelection === null) return { title: "", message: "" };
-    const tile = answerTiles[pendingTileSelection];
-    const tileName = tile?.isSmallerTile ? 'Smaller than all' : tile?.guess;
-    const bonusMessage = allPlayersZeroChip 
-      ? 'If correct, you get 250 chips'
-      : 'If correct, you get 25% of max prize';
-    
-    return {
-      title: "Confirm Selection?",
-      message: `Select "${tileName}"?\n\n${bonusMessage}\n\n(Cannot change after selection)`
-    };
-  };
-
-  const confirmData = getConfirmationMessage();
-
   return (
-    <>
-      <ConfirmModal
-        isOpen={showZeroChipConfirm}
-        onClose={() => {
-          setShowZeroChipConfirm(false);
-          setPendingTileSelection(null);
-        }}
-        onConfirm={confirmZeroChipSelection}
-        title={confirmData.title}
-        message={confirmData.message}
-        confirmText="Confirm"
-        cancelText="Cancel"
-        isDanger={false}
-      />
-      
-      <div>
+    <div>
         {error && (
           <div className="rounded-lg bg-red-100 border border-red-300 p-3 text-red-700 text-sm">
             ⚠️ {error}
@@ -468,7 +424,6 @@ const WagerPhase = ({
         </div>
       </div>
     </div>
-    </>
   );
 };
 
