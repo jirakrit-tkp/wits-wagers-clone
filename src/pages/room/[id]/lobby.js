@@ -286,8 +286,10 @@ const LobbyPage = () => {
   useEffect(() => {
     if (!router.isReady) return;
     
+    console.log(`[Lobby] Router query:`, router.query);
     const urlIsHost = router.query.host === "true";
     const urlHostId = router.query.hostId || router.query.hostid; // Support both cases
+    console.log(`[Lobby] URL check - isHost: ${urlIsHost}, hostId: ${urlHostId}`);
 
     if (urlIsHost && urlHostId && !joined) {
       clientIdRef.current = urlHostId;
