@@ -1,56 +1,120 @@
-# Wits & Wagers - Real-Time Multiplayer Trivia Game
+# Wits & Wagers Clone
 
-A real-time multiplayer trivia and wagering game where players submit answers to trivia questions, then bet chips on which answer they think is closest to the correct one without going over.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org/)
+[![Next.js Version](https://img.shields.io/badge/next.js-15.5.4-black)](https://nextjs.org/)
+[![Socket.IO](https://img.shields.io/badge/socket.io-4.8.1-blue)](https://socket.io/)
 
-## 📖 Description
-
-**Wits & Wagers** is a web-based implementation of the popular board game, designed for remote play with friends and family. Players don't need to know the exact answer to win—they just need to make smart wagers on the best guesses!
-
-### What Makes This Project Stand Out:
-- **Real-time synchronization** using Socket.IO ensures all players see updates instantly
-- **Session persistence** allows players to refresh their browser without losing their game state
-- **Responsive design** works seamlessly on desktop and mobile devices
-- **Host controls** for managing game flow without requiring all players to be ready
-- **Multiple question categories** (General, Entertainment, Dirty) for varied gameplay
-
-### Key Challenges Solved:
-- Maintaining player state across page refreshes and reconnections
-- Preventing duplicate socket listeners and memory leaks in React
-- Synchronizing game phases across multiple clients with minimal latency
-- Managing complex betting logic with chip constraints
-
----
+A real-time multiplayer trivia and wagering game where players submit answers, then bet chips on which guess is closest without going over. Built for remote play with friends and family.
 
 ## 📋 Table of Contents
 
-- [Installation & Setup](#installation--setup)
-- [Usage Guide](#usage-guide)
-- [Features](#features)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Contributing](#contributing)
-- [License](#license)
+- [Project Description](#-project-description)
+- [Features](#-features)
+- [Tech Stack](#-tech-stack)
+- [Installation & Setup](#-installation--setup)
+- [Deployment](#-deployment)
+- [Usage Guide](#-usage-guide)
+- [Project Structure](#-project-structure)
+- [Recent Updates](#-recent-updates)
+- [Roadmap](#-roadmap)
+- [Contributing](#-contributing)
+- [Credits](#-credits)
+- [License](#-license)
 
----
+## 🎯 Project Description
 
-## 🚀 Installation & Setup
+**Wits & Wagers Clone** is a web-based multiplayer game adaptation of the popular board game. Players don't need to know exact answers—just make smart wagers on the best guesses!
+
+### What makes it stand out?
+
+- **Real-time Synchronization**: Socket.IO ensures instant updates across all players
+- **QR Code Joining**: Scan to join games quickly on mobile devices
+- **Session Persistence**: Players can refresh without losing progress
+- **Smart Reconnection**: Automatic reconnection with state recovery
+- **Zero-Chip Players**: Special betting mechanic for players out of chips
+- **Responsive Design**: Seamless experience on desktop, tablet, and mobile
+
+### Key Challenges Solved
+
+1. **Socket Connection Timing**: Implemented async socket initialization with fallback mechanisms
+2. **Room State Management**: Single-instance deployment prevents state loss across requests
+3. **Duplicate Listeners**: Socket singleton pattern prevents memory leaks
+4. **Player Validation**: 1-7 player limit with mid-game join prevention
+5. **Mobile UX**: Icon animations and responsive layouts for small screens
+
+## ✨ Features
+
+### For Players
+- 🎲 Real-time multiplayer for 1-7 players (plus host)
+- 📊 Submit numerical guesses to trivia questions
+- 💰 Bet chips on answers you think are closest
+- 🎯 Zero-chip special betting for comeback opportunities
+- 📱 QR code scanning for quick mobile joining
+- 🔄 Auto-reconnect on connection loss
+- 🏆 Live leaderboard with chip counts
+
+### For Hosts
+- 🎮 Create and manage game rooms
+- 🏷️ Select question categories (General, Entertainment, Dirty)
+- ▶️ Control game flow (start, next round, end game)
+- 👥 See player status in real-time
+- 🗑️ Delete room and end game anytime
+- 📊 View answer distribution during wagering
+
+### System Features
+- ⚡ Real-time updates via WebSocket (Socket.IO)
+- 🎨 Beautiful UI with Tailwind CSS and custom animations
+- 🔒 No authentication required—just share a PIN
+- 📱 Fully responsive with mobile-first design
+- 🎭 Decorative floating icons with animations
+- 🌈 Color-coded players and answer tiles
+- ♿ Accessible with semantic HTML
+
+## 🛠 Tech Stack
+
+### Frontend
+- **Framework**: Next.js 15.5.4 (with Turbopack)
+- **UI Library**: React 19.1.0
+- **Styling**: Tailwind CSS 4
+- **Icons**: Lucide React
+- **QR Code**: qrcode 1.5.4
+- **Real-time**: Socket.IO Client 4.8.1
+
+### Backend
+- **Runtime**: Node.js
+- **Server**: Socket.IO Server 4.8.1
+- **State Management**: In-memory (with persistence support)
+- **API Routes**: Next.js API routes
+
+### Development Tools
+- **Linting**: ESLint 9
+- **Build Tool**: Next.js with Turbopack
+- **Package Manager**: npm
+
+## 📦 Installation & Setup
 
 ### Prerequisites
-- **Node.js** (v18 or higher)
-- **npm** or **yarn**
+
+- Node.js (version 18.0.0 or higher)
+- npm (comes with Node.js)
+- Git
 
 ### Step 1: Clone the Repository
+
 ```bash
-git clone https://github.com/yourusername/wits-wagers.git
-cd wits-wagers
+git clone https://github.com/jirakrit-tkp/wits-wagers-clone.git
+cd wits-wagers-clone
 ```
 
 ### Step 2: Install Dependencies
+
 ```bash
 npm install
 ```
 
-### Step 3: Run the Development Server
+### Step 3: Run Development Server
+
 ```bash
 npm run dev
 ```
@@ -58,183 +122,308 @@ npm run dev
 The application will start at `http://localhost:3000`
 
 ### Environment Variables
-No additional environment variables are required for local development. The Socket.IO server runs on the same port as the Next.js application.
 
----
+No environment variables required for local development! Socket.IO runs on the same server as Next.js.
 
-## 🎮 Usage Guide
+## 🚀 Deployment
+
+### Deploying to Render.com (Recommended)
+
+#### Prerequisites
+- A [Render.com](https://render.com) account (free tier available)
+- Your GitHub repository connected to Render
+
+#### Step 1: Create Web Service
+
+1. Go to Render Dashboard → **New** → **Web Service**
+2. Connect your GitHub repository
+3. Configure the service:
+   - **Name**: `wits-wagers-clone` (or your choice)
+   - **Environment**: `Node`
+   - **Branch**: `main` (or your deployment branch)
+   - **Build Command**: `npm install; npm run build`
+   - **Start Command**: `npm run start`
+   - **Instance Type**: `Free` or `Starter` (recommended for no sleep)
+
+#### Step 2: Set Environment Variables
+
+In Render Dashboard → **Environment** tab, add:
+
+```env
+WEB_CONCURRENCY=1
+PORT=10000
+```
+
+**Important**: `WEB_CONCURRENCY=1` ensures single-instance deployment to preserve in-memory room state.
+
+#### Step 3: Deploy
+
+Click **Create Web Service**. Render will:
+- Install dependencies
+- Build your Next.js app
+- Start the server
+- Provide a live URL (e.g., `https://your-app.onrender.com`)
+
+#### Free Tier Considerations
+
+⚠️ **Free instances spin down after 15 minutes of inactivity**, causing:
+- 30-50 second wake-up time on first request
+- All room state lost during sleep
+
+**Recommendation**: Upgrade to **Starter ($7/month)** for:
+- No sleep/downtime
+- Faster performance
+- Always-available rooms
+
+### Alternative: Vercel Deployment
+
+**Note**: Socket.IO requires persistent WebSocket connections. Vercel's serverless functions are not ideal for this use case. Render or similar PaaS platforms are recommended.
+
+If you still want to try Vercel:
+1. Install Vercel CLI: `npm i -g vercel`
+2. Run: `vercel`
+3. Follow prompts
+
+**Limitation**: Serverless functions timeout after a period, disconnecting sockets.
+
+## 📖 Usage Guide
 
 ### Creating a Game (Host)
 
-1. Visit the homepage at `http://localhost:3000`
-2. Click **"Host Game"**
-3. Enter your desired room PIN (e.g., "ABC123")
-4. Share the room PIN with your players
-5. Wait for players to join in the lobby
+1. Navigate to the landing page
+2. Click **"Create Room"**
+3. A room code will be generated (e.g., `T5MR`)
+4. Click **"Enter"** to go to the lobby
+5. Share the room code or QR code with players
 6. Select question categories (optional)
-7. Click **"Start"** to begin the game
+7. Wait for players to join
+8. Click **"Start Game"** when ready (requires 1-7 players)
 
 ### Joining a Game (Player)
 
-1. Visit the homepage
-2. Click **"Join Game"**
-3. Enter the room PIN provided by the host
-4. Choose your name and color
-5. Click **"Join"**
-6. Wait in the lobby for the host to start
+1. On the landing page, enter the room code in **"Join"**
+2. Click **"Join"** button
+3. Enter your name and choose a color
+4. Click **"Join"** to enter the lobby
+5. Wait for the host to start the game
 
 ### Gameplay Flow
 
-**Phase 1: Question**
-- All players see a trivia question
-- Submit your best guess (closest without going over wins)
-- Wait for all players to submit
+#### Phase 1: Question (30-60s)
+1. Read the trivia question
+2. Submit your numerical guess
+3. Wait for all players to submit
+4. Host can see who's submitted
 
-**Phase 2: Wager**
-- View all submitted answers arranged as betting tiles
-- Place chips on the answer(s) you think are closest
-- Confirm your wagers when ready
+#### Phase 2: Wager (60-90s)
+1. View all guesses as betting tiles (sorted lowest to highest)
+2. Place chips on tile(s) you think are closest without going over
+3. Adjust bets by clicking tiles multiple times
+4. "Smaller than all" tile available if you think all guesses are too high
+5. Click **"Confirm Wagers"** when ready
+6. **Zero-chip players**: Click any tile for special free bet (25% of max prize or 250 chips)
 
-**Phase 3: Payout**
-- See the correct answer revealed
-- Watch chip payouts calculated based on bets
-- Winning tile earns multiplier rewards
+#### Phase 3: Payout
+1. Correct answer is revealed
+2. Winning tile highlighted in gold
+3. Chip payouts calculated:
+   - **6x multiplier**: If you guessed the winning tile
+   - **2x multiplier**: If you bet on the winning tile
+   - **Special bonus**: Zero-chip winners get 25% of max or 250 chips
+4. Updated chip counts shown
+5. Host clicks **"Next Round"**
 
-**Phase 4: Next Round**
-- Host clicks "Next Round" to continue
-- Game continues for 7 rounds by default
-- Final leaderboard shown at the end
+#### End Game
+- After 7 rounds, final leaderboard is displayed
+- Player with most chips wins!
+- Host can start a new game
 
-### Host Controls
+### Tips for Players
 
-During gameplay, the host has access to:
-- **Next Round** (in payout phase) - Advance to the next question
-- **New Game** (after game ends) - Start a fresh game
-- **Delete Room** (anytime) - End the game and kick all players
+- **Conservative guesses** often win (closer without going over)
+- **Bet big** when you're confident
+- **Diversify bets** when uncertain
+- **Watch for patterns** in other players' guessing styles
+- **Zero chips?** You get a free special bet—make it count!
 
----
-
-## ✨ Features
-
-### Core Gameplay
-- ✅ Real-time multiplayer for 2-8+ players
-- ✅ Trivia questions from multiple categories
-- ✅ Chip-based wagering system with multipliers
-- ✅ Automatic answer sorting and tile generation
-- ✅ Smart payout calculations with bonus for zero-chip players
-
-### Technical Features
-- ✅ Session persistence across page refreshes
-- ✅ Automatic reconnection handling
-- ✅ Host migration support
-- ✅ No authentication required - just share a PIN
-- ✅ Responsive UI for all screen sizes
-- ✅ Real-time player status indicators
-- ✅ Performance-optimized with minimal logging
-
-### User Experience
-- ✅ Clean, colorful interface inspired by the board game
-- ✅ Visual feedback for all actions
-- ✅ Progress indicators (rounds, player status)
-- ✅ Category tags for questions
-- ✅ Correct answer explanations
-
----
-
-## 🛠 Tech Stack
-
-### Frontend
-- **Next.js 15.5.4** - React framework with server-side rendering
-- **React 19** - UI component library
-- **Tailwind CSS** - Utility-first CSS framework
-- **Socket.IO Client** - Real-time bidirectional communication
-
-### Backend
-- **Next.js API Routes** - Serverless API endpoints
-- **Socket.IO Server** - WebSocket server for real-time events
-- **Node.js** - JavaScript runtime
-
-### Build Tools
-- **Turbopack** - Fast bundler (Next.js 15 default)
-- **ESLint** - Code linting
-
----
-
-## 📁 Project Structure
+## 📂 Project Structure
 
 ```
-wits-wagers/
+wits-wagers-clone/
+├── public/                      # Static assets
+│   ├── favicon.ico
+│   └── *.svg                   # Icon assets
+│
 ├── src/
-│   ├── components/          # React components
-│   │   ├── HostControls.js
-│   │   ├── QuestionCard.js
-│   │   ├── WagerPhase.js
-│   │   ├── PayoutPhase.js
-│   │   └── SiteFooter.js
-│   ├── lib/                 # Utilities and data
-│   │   ├── gameState.js     # Game logic and state management
-│   │   ├── questions.json   # Trivia question database
-│   │   └── socketManager.js # Socket.IO singleton manager
-│   ├── pages/               # Next.js pages
+│   ├── components/              # React components
+│   │   ├── ConfirmModal.js     # Confirmation dialogs
+│   │   ├── HostControls.js     # Host action buttons
+│   │   ├── HowToPlayModal.js   # Game instructions
+│   │   ├── Modal.js            # Base modal component
+│   │   ├── PayoutPhase.js      # Results and payout display
+│   │   ├── QuestionCard.js     # Question display
+│   │   ├── SiteFooter.js       # Footer with how-to-play
+│   │   ├── Snackbar.js         # Toast notifications
+│   │   └── WagerPhase.js       # Betting interface
+│   │
+│   ├── lib/                    # Core logic and utilities
+│   │   ├── gameState.js        # Game state management
+│   │   ├── questions.json      # Trivia question database
+│   │   └── socketManager.js    # Socket.IO singleton
+│   │
+│   ├── pages/                  # Next.js pages
 │   │   ├── api/
-│   │   │   └── socketio.js  # Socket.IO server endpoint
+│   │   │   └── socketio.js     # Socket.IO server setup
 │   │   ├── room/
-│   │   │   ├── [id].js      # Game room page
+│   │   │   ├── [id].js         # Game room (main gameplay)
 │   │   │   └── [id]/
-│   │   │       └── lobby.js # Pre-game lobby
-│   │   ├── _app.js
-│   │   ├── _document.js
-│   │   └── index.js         # Landing page
+│   │   │       └── lobby.js    # Pre-game lobby
+│   │   ├── _app.js             # App wrapper
+│   │   ├── _document.js        # HTML document
+│   │   └── index.js            # Landing page
+│   │
 │   └── styles/
-│       └── globals.css      # Global styles
-├── public/                  # Static assets
+│       └── globals.css         # Global styles and animations
+│
+├── .gitignore
+├── eslint.config.mjs           # ESLint configuration
+├── jsconfig.json               # JavaScript config
+├── next.config.mjs             # Next.js configuration
 ├── package.json
+├── postcss.config.mjs          # PostCSS config
 └── README.md
 ```
 
----
+## 🆕 Recent Updates
+
+### v2.0.0 - Socket & UX Improvements (Oct 2025)
+
+#### Fixed
+- **Socket Connection Timing**: Added `socketReady` state to prevent race conditions
+- **Room Creation**: Implemented connection retry logic with 3s timeout
+- **Room Deletion**: Fixed "Room not found" error by ensuring proper socket initialization
+- **Single Instance**: Set `WEB_CONCURRENCY=1` for Render deployment
+
+#### Added
+- **QR Code**: Automatic QR code generation for easy mobile joining
+- **Player Validation**: Enforce 1-7 player limit, prevent mid-game joins
+- **Snackbar Notifications**: Replace alerts with elegant toast messages
+- **Decorative Icons**: Animated floating icons in placeholder sections
+- **Responsive Layouts**: Improved mobile and tablet layouts
+- **Category Badge**: Moved to top-left of question cards
+
+#### Improved
+- **Host Controls**: Moved to sidebar, vertical layout to prevent overflow
+- **Action Buttons**: Better responsive behavior in lobby
+- **Zero-Chip UX**: Removed redundant confirmation modal
+- **Debug Logging**: Added comprehensive logs for troubleshooting
+
+## 🗺️ Roadmap
+
+### Planned Features
+
+- [ ] **Custom Questions**: Allow hosts to add custom questions
+- [ ] **Game Settings**: Configurable round count, starting chips, timer
+- [ ] **Sound Effects**: Audio feedback for actions and phase changes
+- [ ] **Animations**: Smooth transitions between phases
+- [ ] **Chat System**: In-game text chat for players
+- [ ] **Game History**: Save and replay past games
+- [ ] **Achievements**: Unlock badges for milestones
+- [ ] **Leaderboards**: Global or friend leaderboards
+- [ ] **Team Mode**: Play as teams instead of individuals
+- [ ] **Question Packs**: Themed question categories (Movies, Sports, Science)
+- [ ] **Admin Dashboard**: Manage questions, rooms, and users
+- [ ] **PWA Support**: Install as mobile app
+
+### Future Enhancements
+
+- Migration to TypeScript for type safety
+- Redis/Database for persistent room storage
+- User accounts and profiles
+- Private/public room options
+- Spectator mode
+- Multiple languages (i18n)
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how you can help:
+Contributions are welcome! Please follow these guidelines:
 
-### Reporting Bugs
-1. Check if the issue already exists in [Issues](https://github.com/yourusername/wits-wagers/issues)
+### How to Contribute
+
+1. **Fork the repository**
+   ```bash
+   git fork https://github.com/jirakrit-tkp/wits-wagers-clone.git
+   ```
+
+2. **Create a feature branch**
+   ```bash
+   git checkout -b feature/amazing-feature
+   ```
+
+3. **Make your changes**
+   - Follow existing code style
+   - Add comments for complex logic
+   - Test on both desktop and mobile
+   - Ensure no linting errors (`npm run lint`)
+
+4. **Commit your changes**
+   ```bash
+   git commit -m "feat: add amazing feature"
+   ```
+
+5. **Push to your branch**
+   ```bash
+   git push origin feature/amazing-feature
+   ```
+
+6. **Open a Pull Request**
+   - Describe your changes clearly
+   - Reference any related issues
+   - Include screenshots for UI changes
+
+### Code Style Guidelines
+
+- Use functional components with hooks (no class components)
+- Always add `displayName` to components
+- Use semantic HTML tags (`<section>`, `<article>`, `<header>`)
+- Avoid inline CSS styles (use Tailwind classes)
+- Add `alt` text to all images
+- Wrap special characters in JSX: `{"It's fine"}`
+- Avoid `any` type; use `unknown` or specific types
+
+### Reporting Issues
+
+Found a bug or have a feature request?
+
+1. Check [Issues](https://github.com/jirakrit-tkp/wits-wagers-clone/issues) first
 2. Create a new issue with:
-   - Clear description of the bug
-   - Steps to reproduce
+   - Clear description
+   - Steps to reproduce (for bugs)
    - Expected vs actual behavior
-   - Screenshots if applicable
-
-### Suggesting Features
-1. Open a new issue with the **enhancement** label
-2. Describe the feature and its benefits
-3. Include mockups or examples if possible
-
-### Submitting Pull Requests
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-- Follow the existing code style
-- Add comments for complex logic
-- Test thoroughly on both desktop and mobile
-- Ensure no console errors in production builds
-
----
+   - Screenshots/logs if applicable
+   - Device and browser info
 
 ## 🙏 Credits
 
-- **Original Game**: [Wits & Wagers](https://boardgamegeek.com/boardgame/20100/wits-wagers) by Dominic Crapuchettes
-- **Inspiration**: Board game mechanics adapted for online play
-- **Technologies**: Built with Next.js, Socket.IO, and Tailwind CSS
+### Original Game
 
-Special thanks to the open-source community for excellent documentation and examples.
+- **Wits & Wagers** by Dominic Crapuchettes, North Star Games
+- [BoardGameGeek Page](https://boardgamegeek.com/boardgame/20100/wits-wagers)
 
----
+### Technologies & Libraries
+
+- [Next.js](https://nextjs.org/) - React framework
+- [React](https://react.dev/) - UI library
+- [Socket.IO](https://socket.io/) - Real-time engine
+- [Tailwind CSS](https://tailwindcss.com/) - CSS framework
+- [Lucide React](https://lucide.dev/) - Icon library
+- [QRCode](https://github.com/soldair/node-qrcode) - QR code generation
+
+### Acknowledgments
+
+- TechUp program for guidance
+- Open-source community for tools and libraries
+- Friends and family for playtesting
 
 ## 📄 License
 
@@ -243,7 +432,7 @@ This project is licensed under the **MIT License**.
 ```
 MIT License
 
-Copyright (c) 2025 [Your Name]
+Copyright (c) 2025 Wits & Wagers Clone
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -266,31 +455,11 @@ SOFTWARE.
 
 ---
 
-## 🔮 Roadmap / Future Plans
-
-- [ ] Add more question categories and difficulty levels
-- [ ] Implement game replay/history feature
-- [ ] Add sound effects and animations
-- [ ] Create admin panel for managing questions
-- [ ] Support custom question uploads
-- [ ] Add timer for question phase
-- [ ] Implement achievements/badges system
-- [ ] Mobile app version (React Native)
-- [ ] Spectator mode for observers
-- [ ] Tournament bracket system
-
----
-
-## 📧 Contact & Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/wits-wagers/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/wits-wagers/discussions)
-
----
-
 <div align="center">
 
-**Made with ❤️ for game night enthusiasts**
+**Built with ❤️ for game night enthusiasts**
+
+[Report Bug](https://github.com/jirakrit-tkp/wits-wagers-clone/issues) · [Request Feature](https://github.com/jirakrit-tkp/wits-wagers-clone/issues) · [Play Now](https://wits-wagers-clone.onrender.com)
 
 ⭐ Star this repo if you enjoy playing!
 
