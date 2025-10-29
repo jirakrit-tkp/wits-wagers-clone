@@ -33,17 +33,15 @@ const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost
         isDanger={true}
       />
       
-      <section className="bg-black shadow-xl overflow-hidden">
-      {/* Desktop: Horizontal layout */}
-      <div className="hidden md:flex p-4 items-center justify-between">
-        <h2 className="text-white font-bold text-lg">Host Controls</h2>
+      <section className="border-b border-white/20 pb-4">
+        <h3 className="text-sm uppercase tracking-wider text-white/60 mb-3">Host Controls</h3>
         
-        <div className="flex items-center gap-3">
+        <div className="space-y-2">
           {(phase === "reveal" || phase === "payout") && (
             <button
               type="button"
               onClick={handleNextRound}
-              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 shadow-lg transition"
+              className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 text-sm shadow-lg transition"
             >
               Next Round
             </button>
@@ -53,7 +51,7 @@ const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 shadow-lg transition"
+              className="w-full rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 text-sm shadow-lg transition"
             >
               New Game
             </button>
@@ -62,45 +60,11 @@ const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost
           <button
             type="button"
             onClick={() => setShowDeleteConfirm(true)}
-            className="rounded-xl bg-black hover:bg-red-600 text-white font-semibold px-6 py-3 shadow-lg transition"
+            className="w-full rounded-lg bg-black hover:bg-red-600 text-white font-semibold px-4 py-2.5 text-sm shadow-lg transition"
           >
             Delete Room
           </button>
         </div>
-      </div>
-
-      {/* Mobile: Vertical layout */}
-      <div className="md:hidden p-3 space-y-2">
-        <h3 className="text-sm font-bold text-white mb-2">Host Controls</h3>
-        
-        {(phase === "reveal" || phase === "payout") && (
-          <button
-            type="button"
-            onClick={handleNextRound}
-            className="w-full rounded-md bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm transition"
-          >
-            Next Round
-          </button>
-        )}
-
-        {phase === "finished" && (
-          <button
-            type="button"
-            onClick={() => window.location.reload()}
-            className="w-full rounded-md bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 text-sm transition"
-          >
-            New Game
-          </button>
-        )}
-
-        <button
-          type="button"
-          onClick={() => setShowDeleteConfirm(true)}
-          className="w-full rounded-md bg-black hover:bg-red-600 text-white font-semibold px-4 py-2 text-sm transition"
-        >
-          Delete Room
-        </button>
-      </div>
     </section>
     </>
   );

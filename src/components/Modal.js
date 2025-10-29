@@ -2,8 +2,8 @@ const Modal = ({ isOpen, onClose, title, children, actions }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-auto p-6 relative max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-auto p-6 relative max-h-[90vh] overflow-y-auto z-[10000]">
         <button
           type="button"
           onClick={onClose}

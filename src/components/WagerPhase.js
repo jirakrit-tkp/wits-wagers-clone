@@ -167,7 +167,7 @@ const WagerPhase = ({
         isDanger={false}
       />
       
-      <div className="space-y-6">
+      <div>
         {error && (
           <div className="rounded-lg bg-red-100 border border-red-300 p-3 text-red-700 text-sm">
             ⚠️ {error}
@@ -175,7 +175,7 @@ const WagerPhase = ({
         )}
 
       {/* Wager Table - Snooker Style */}
-      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-4 sm:p-6 shadow-2xl">
+      <div className="rounded-xl bg-gradient-to-br from-green-700 to-green-800 p-4 sm:p-6 shadow-2xl mb-6">
         <div className="flex flex-col-reverse md:flex-row gap-3 md:gap-4 items-stretch justify-center">
           {answerTiles.map((tile, index) => {
             const pendingBet = pendingBets[index] || 0;
@@ -330,8 +330,8 @@ const WagerPhase = ({
       </div>
 
       {/* Action Zone (Yellow Theme) */}
-      <div className="rounded-xl bg-gradient-to-br from-yellow-100 to-yellow-50 border-2 border-yellow-300 shadow-xl overflow-hidden mt-4">
-        <div className="p-6 bg-gradient-to-r from-yellow-200 to-yellow-100 space-y-4">
+      <div className="rounded-xl bg-yellow-100 shadow-xl overflow-hidden">
+        <div className="p-6 space-y-4">
           {!isHost && (
             <>
               {/* Special Chance Info (for zero-chip players) */}
