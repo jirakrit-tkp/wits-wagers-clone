@@ -30,6 +30,8 @@ const LobbyPage = () => {
   const [selectedCategories, setSelectedCategories] = useState(availableCategories);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const dropdownButtonRef = useRef(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, right: 0 });
   
   // Modal states
   const [showNameAlert, setShowNameAlert] = useState(false);
@@ -872,10 +874,21 @@ const LobbyPage = () => {
                     {isHost ? (
                       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center" ref={dropdownRef}>
                       {/* Category Dropdown (Host Only) */}
-                      <div className="relative">
+                      <div className="relative z-50">
                         <button
+                          ref={dropdownButtonRef}
                           type="button"
-                          onClick={() => setDropdownOpen(!dropdownOpen)}
+                          onClick={() => {
+                            if (dropdownButtonRef.current) {
+                              const rect = dropdownButtonRef.current.getBoundingClientRect();
+                              setDropdownPosition({
+                                top: rect.bottom + 8,
+                                left: rect.left,
+                                right: window.innerWidth - rect.right
+                              });
+                            }
+                            setDropdownOpen(!dropdownOpen);
+                          }}
                           className="w-full sm:w-auto rounded-xl border-2 border-yellow-400 bg-white px-4 py-3 text-black font-bold hover:bg-yellow-50 transition shadow-lg flex items-center justify-center gap-2"
                           title="Select Categories"
                         >
@@ -888,9 +901,17 @@ const LobbyPage = () => {
                           </svg>
                         </button>
 
-                        {/* Dropdown Menu */}
+                        {/* Dropdown Menu - Use fixed positioning to escape overflow constraint */}
                         {dropdownOpen && (
-                          <div className="absolute left-0 sm:right-0 mt-2 w-full sm:w-56 bg-white rounded-lg border-2 border-yellow-400 shadow-xl z-50">
+                          <div 
+                            className="fixed bg-white rounded-lg border-2 border-yellow-400 shadow-xl z-[9999] max-h-[calc(100vh-200px)] overflow-y-auto"
+                            style={{
+                              top: `${dropdownPosition.top}px`,
+                              left: window.innerWidth >= 640 ? 'auto' : `${dropdownPosition.left}px`,
+                              right: window.innerWidth >= 640 ? `${dropdownPosition.right}px` : 'auto',
+                              width: window.innerWidth >= 640 ? '14rem' : 'calc(100vw - 2rem)',
+                            }}
+                          >
                             <div className="p-2">
                               {availableCategories.map(category => (
                                 <label
