@@ -5,10 +5,11 @@ const rooms = {};
 
 export const STARTING_CHIPS = 500;
 
-export function createRoom(roomId, hostId) {
+export function createRoom(roomId, hostId, hostMode = "gm") {
   rooms[roomId] = {
     id: roomId,
     hostId: hostId || null,
+    hostMode: hostMode || "gm", // "gm" or "player"
     players: [],
     phase: 'lobby', // 'lobby' | 'question' | 'reveal' | 'wager' | 'payout' | 'finished'
     questions: [],
@@ -19,6 +20,7 @@ export function createRoom(roomId, hostId) {
     answerTiles: [], // Sorted unique answers with multipliers
     bets: [], // { playerId, tileIndex, amount }
     confirmedWagers: [], // [playerId] - players who confirmed their bets
+    readyForNextRound: [], // [playerId] - players ready for next round (payout phase)
     chips: {}, // { playerId: chipCount }
     chipsAtWagerStart: {}, // Snapshot of chips at the START of wager phase
     scores: {}, // Keep for backwards compatibility, but chips are primary now
@@ -500,6 +502,7 @@ export function startGame(roomId, categories = null) {
   room.answerTiles = [];
   room.bets = [];
   room.confirmedWagers = [];
+  room.readyForNextRound = [];
   
   console.log(`[gameState] ✅ Phase changed to: ${room.phase}, round: ${room.currentRound}`);
   console.log(`[gameState] 💰 Player chips:`, room.chips);
@@ -516,6 +519,9 @@ export function startGame(roomId, categories = null) {
 export function nextRound(roomId) {
   const room = getRoom(roomId);
   if (!room) return null;
+  
+  // Reset readyForNextRound when starting new round
+  room.readyForNextRound = [];
   
   room.currentRound += 1;
   
@@ -567,4 +573,30 @@ export function setPhase(roomId, phase) {
   
   room.phase = phase;
   return { phase: room.phase };
+}
+
+// Player marks ready for next round (payout phase)
+export function readyForNextRound(roomId, playerId) {
+  const room = getRoom(roomId);
+  if (!room) return { success: false, error: 'Room not found' };
+  
+  // Check if player already marked ready
+  if (room.readyForNextRound.includes(playerId)) {
+    console.log(`[gameState] Player ${playerId} already ready for next round`);
+    return { success: true, alreadyReady: true };
+  }
+  
+  // Add to ready list
+  room.readyForNextRound.push(playerId);
+  console.log(`[gameState] ✅ Player ${playerId} ready for next round (${room.readyForNextRound.length}/${room.players.length})`);
+  
+  // Check if all players ready
+  const allReady = room.readyForNextRound.length === room.players.length && room.players.length > 0;
+  
+  return { 
+    success: true, 
+    readyCount: room.readyForNextRound.length,
+    totalPlayers: room.players.length,
+    allReady 
+  };
 }

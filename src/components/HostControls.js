@@ -12,6 +12,20 @@ const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost
     socket?.emit("nextRound", { roomId });
   };
 
+  const handleForceNextPhase = () => {
+    const phaseMap = {
+      "question": "wager",
+      "wager": "payout",
+      "payout": "question",
+      "reveal": "wager",
+      "scoring": "finished"
+    };
+    const nextPhase = phaseMap[phase];
+    if (nextPhase) {
+      socket?.emit("setPhase", { roomId, phase: nextPhase });
+    }
+  };
+
   const handleDeleteRoom = () => {
     socket?.emit("deleteRoom", { roomId, hostId });
     sessionStorage.removeItem(`room_${roomId}`);
@@ -37,6 +51,17 @@ const HostControls = ({ roomId, phase, currentRound, totalRounds, socket, isHost
         <h3 className="text-sm uppercase tracking-wider text-white/60 mb-3">Host Controls</h3>
         
         <div className="space-y-2">
+          {/* Force Next Phase Button - Available in all phases except payout (where Next Question button shows) */}
+          {phase !== "lobby" && phase !== "finished" && phase !== "payout" && (
+            <button
+              type="button"
+              onClick={handleForceNextPhase}
+              className="w-full rounded-lg bg-orange-600 hover:bg-orange-700 text-white font-bold px-4 py-2.5 text-sm shadow-lg transition"
+            >
+              Force Next Phase
+            </button>
+          )}
+
           {(phase === "reveal" || phase === "payout") && (
             <button
               type="button"
