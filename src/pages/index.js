@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import SiteFooter from "@/components/SiteFooter";
 import Snackbar from "@/components/Snackbar";
@@ -8,6 +8,9 @@ export default function HomePage() {
   const [createdRoomId, setCreatedRoomId] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
   const [hostId, setHostId] = useState("");
+  const [hostMode, setHostMode] = useState("gm"); // "gm" or "player"
+  const [playAsDropdownOpen, setPlayAsDropdownOpen] = useState(false);
+  const playAsDropdownRef = useRef(null);
   const [snackbar, setSnackbar] = useState({ isOpen: false, message: "", type: "info" });
 
   const createRoom = () => {
@@ -20,7 +23,12 @@ export default function HomePage() {
 
   const goToCreatedRoom = () => {
     if (!createdRoomId) return;
-    router.push(`/room/${createdRoomId}/lobby?host=true&hostId=${hostId}`);
+    const params = new URLSearchParams({
+      host: "true",
+      hostId: hostId,
+      hostMode: hostMode,
+    });
+    router.push(`/room/${createdRoomId}/lobby?${params.toString()}`);
   };
 
   const showSnackbar = (message, type = "info") => {
@@ -41,6 +49,23 @@ export default function HomePage() {
     // Redirect to lobby - validation will happen on server side
     router.push(`/room/${trimmed}/lobby`);
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (playAsDropdownRef.current && !playAsDropdownRef.current.contains(event.target)) {
+        setPlayAsDropdownOpen(false);
+      }
+    };
+
+    if (playAsDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [playAsDropdownOpen]);
 
   return (
     <main className="h-screen w-screen bg-yellow-200 relative overflow-hidden flex flex-col">
@@ -69,7 +94,7 @@ export default function HomePage() {
           <div className="mt-6 w-full md:max-w-3xl mx-auto flex justify-center">
             <div className="flex flex-col md:flex-row gap-4 max-sm:w-full">
               {/* Host / Create Room */}
-              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl p-4 flex flex-col items-center text-cente">
+              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl p-4 flex flex-col items-center text-center">
                 <h2 className="text-lg font-bold text-blue-900">Host</h2>
                 {!createdRoomId && (
                   <button
@@ -81,24 +106,75 @@ export default function HomePage() {
                   </button>
                 )}
                 {createdRoomId && (
-                  <div className="mt-3 w-full">
+                  <div className="mt-3 w-full space-y-3">
                     <a
-                      className="block break-words font-mono text-blue-800 underline"
+                      className="block break-words font-mono text-blue-800 underline text-sm"
                       href={`/room/${createdRoomId}`}
                     >{`/room/${createdRoomId}`}</a>
-                    <button
-                      type="button"
-                      onClick={goToCreatedRoom}
-                      className="mt-3 w-full inline-flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 shadow-md transition whitespace-nowrap"
-                    >
-                      Enter
-                    </button>
+                    
+                    {/* Play as selection - left side, Enter button - right side */}
+                    <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+                      {/* Play as dropdown - left */}
+                      <div className="flex-1 relative" ref={playAsDropdownRef}>
+                        <button
+                          type="button"
+                          onClick={() => setPlayAsDropdownOpen(!playAsDropdownOpen)}
+                          className="w-full rounded-full border-2 border-blue-700 bg-white px-4 py-3 text-black font-bold hover:bg-blue-50 transition shadow-lg flex items-center justify-between"
+                        >
+                          <span>{hostMode === "gm" ? "GM" : "Player"}</span>
+                          <svg className={`w-4 h-4 transition-transform ${playAsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {playAsDropdownOpen && (
+                          <div className="absolute left-0 right-0 mt-2 w-full bg-white rounded-lg border-2 border-blue-700 shadow-xl z-50">
+                            <div className="p-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setHostMode("gm");
+                                  setPlayAsDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition text-left ${
+                                  hostMode === "gm" ? "bg-blue-100" : "hover:bg-blue-50"
+                                }`}
+                              >
+                                <span className="text-black font-semibold">GM</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setHostMode("player");
+                                  setPlayAsDropdownOpen(false);
+                                }}
+                                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition text-left ${
+                                  hostMode === "player" ? "bg-blue-100" : "hover:bg-blue-50"
+                                }`}
+                              >
+                                <span className="text-black font-semibold">Player</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Enter button - right */}
+                      <button
+                        type="button"
+                        onClick={goToCreatedRoom}
+                        className="w-full sm:w-auto sm:flex-shrink-0 rounded-full bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2.5 shadow-md transition whitespace-nowrap self-end sm:self-auto"
+                      >
+                        Enter
+                      </button>
+                    </div>
                   </div>
                 )}
               </article>
 
               {/* Join Room */}
-              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl border border-yellow-300 p-4 flex flex-col items-center text-center">
+              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl border border-yellow-300 p-4 flex flex-col items-center text-center z-10">
                 <h2 className="text-lg font-bold text-blue-900">Join</h2>
                 <form
                   className="mt-3 w-full flex flex-col sm:flex-row gap-2"

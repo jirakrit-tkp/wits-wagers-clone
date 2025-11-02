@@ -44,6 +44,7 @@ export default function RoomPage() {
   const [currentBets, setCurrentBets] = useState([]);
   const [confirmedWagers, setConfirmedWagers] = useState([]);
   const [zeroChipPlayers, setZeroChipPlayers] = useState([]);
+  const [readyForNextRound, setReadyForNextRound] = useState([]);
   
   // Snackbar state
   const [snackbar, setSnackbar] = useState({ isOpen: false, message: "", type: "info" });
@@ -142,6 +143,8 @@ export default function RoomPage() {
       s.off("payoutResult");
       s.off("wagersConfirmed");
       s.off("confirmWagerError");
+      s.off("readyForNextRoundUpdate");
+      s.off("readyForNextRoundError");
       
       // Set up ALL event listeners FIRST before joining
       // Listen for room updates
@@ -188,6 +191,8 @@ export default function RoomPage() {
           setGuess("");
           setRoundResult(null);
         }
+        // Reset ready for next round when new round starts
+        setReadyForNextRound([]);
       });
       
       // Listen for round result (legacy - keep for backwards compatibility)
@@ -231,6 +236,17 @@ export default function RoomPage() {
       // Listen for confirm wager errors
       s.on("confirmWagerError", (data) => {
         console.error("[Room] Confirm wager error:", data.error);
+        setSnackbar({ isOpen: true, message: data.error, type: "error" });
+      });
+      
+      // Listen for ready for next round updates
+      s.on("readyForNextRoundUpdate", (data) => {
+        setReadyForNextRound(data.readyPlayers || []);
+      });
+      
+      // Listen for ready for next round errors
+      s.on("readyForNextRoundError", (data) => {
+        console.error("[Room] Ready for next round error:", data.error);
         setSnackbar({ isOpen: true, message: data.error, type: "error" });
       });
       
@@ -370,6 +386,14 @@ export default function RoomPage() {
   const confirmWagers = () => {
     if (!socketRef.current || !clientIdRef.current) return;
     socketRef.current.emit("confirmWagers", {
+      roomId: id,
+      playerId: clientIdRef.current
+    });
+  };
+
+  const markReadyForNextRound = () => {
+    if (!socketRef.current || !clientIdRef.current) return;
+    socketRef.current.emit("readyForNextRound", {
       roomId: id,
       playerId: clientIdRef.current
     });
@@ -730,46 +754,66 @@ export default function RoomPage() {
 
                     {/* 3. Action Zone (Yellow Theme) - Bottom */}
                     <div className="rounded-xl bg-yellow-100 shadow-xl overflow-hidden">
-                      {!isHost && !hasSubmitted ? (
-                        <div className="p-6">
-                          <div className="mb-3 text-center">
-                            <h3 className="text-xl font-bold text-yellow-900 mb-1">💭 Submit Your Answer</h3>
-                            <p className="text-yellow-700 text-sm">Enter a number - your best guess!</p>
-                          </div>
-                          <div className="flex flex-col sm:flex-row items-center gap-3">
-                            <label htmlFor="guess" className="sr-only">Your Answer</label>
-                            <input
-                              id="guess"
-                              type="number"
-                              placeholder="Type a number..."
-                              value={guess}
-                              onChange={(e) => setGuess(e.target.value)}
-                              onKeyDown={(e) => e.key === "Enter" && submitAnswer()}
-                              className="flex-1 rounded-xl border-2 border-yellow-400 px-6 py-4 text-yellow-900 text-lg font-bold placeholder-yellow-900/40 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white shadow-md transition"
-                            />
-                            <button
-                              type="button"
-                              onClick={submitAnswer}
-                              className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base px-8 py-3 shadow-md transition"
-                            >
-                              Submit Answer
-                            </button>
-                          </div>
-                        </div>
-                      ) : !isHost && hasSubmitted ? (
-                        <div className="text-center py-3">
-                          <h3 className="text-yellow-900 text-base font-bold mb-2">Answer Submitted</h3>
-                          <p className="text-yellow-700 text-sm">Waiting for other players...</p>
-                        </div>
-                      ) : (
-                        <div className="text-center py-3">
-                          <h3 className="text-yellow-900 text-base font-bold mb-2">Host View</h3>
-                          <p className="text-yellow-700 text-sm mb-2">Waiting for all players to answer...</p>
-                          <p className="text-yellow-900 font-bold text-sm">
-                            {answers.length}/{players.length} answered
-                          </p>
-                        </div>
-                      )}
+                      {(() => {
+                        // Check if host is in player mode (exists in players list)
+                        const hostAsPlayer = isHost && players.some(p => p.id === clientIdRef.current);
+                        const isGMHost = isHost && !hostAsPlayer;
+                        
+                        // For players (including host in player mode)
+                        if (!isGMHost && !hasSubmitted) {
+                          return (
+                            <div className="p-6">
+                              <div className="mb-3 text-center">
+                                <h3 className="text-xl font-bold text-yellow-900 mb-1">💭 Submit Your Answer</h3>
+                                <p className="text-yellow-700 text-sm">Enter a number - your best guess!</p>
+                              </div>
+                              <div className="flex flex-col sm:flex-row items-center gap-3">
+                                <label htmlFor="guess" className="sr-only">Your Answer</label>
+                                <input
+                                  id="guess"
+                                  type="number"
+                                  placeholder="Type a number..."
+                                  value={guess}
+                                  onChange={(e) => setGuess(e.target.value)}
+                                  onKeyDown={(e) => e.key === "Enter" && submitAnswer()}
+                                  className="flex-1 rounded-xl border-2 border-yellow-400 px-6 py-4 text-yellow-900 text-lg font-bold placeholder-yellow-900/40 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white shadow-md transition"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={submitAnswer}
+                                  className="w-full sm:w-auto rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-base px-8 py-3 shadow-md transition"
+                                >
+                                  Submit Answer
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }
+                        
+                        if (!isGMHost && hasSubmitted) {
+                          return (
+                            <div className="text-center py-3">
+                              <h3 className="text-yellow-900 text-base font-bold mb-2">Answer Submitted</h3>
+                              <p className="text-yellow-700 text-sm">Waiting for other players...</p>
+                            </div>
+                          );
+                        }
+                        
+                        // For GM host
+                        if (isGMHost) {
+                          return (
+                            <div className="text-center py-3">
+                              <h3 className="text-yellow-900 text-base font-bold mb-2">Host View (GM Mode)</h3>
+                              <p className="text-yellow-700 text-sm mb-2">Waiting for all players to answer...</p>
+                              <p className="text-yellow-900 font-bold text-sm">
+                                {answers.length}/{players.length} answered
+                              </p>
+                            </div>
+                          );
+                        }
+                        
+                        return null;
+                      })()}
                     </div>
                   </>
                 )}
@@ -887,7 +931,7 @@ export default function RoomPage() {
                     currentBets={currentBets}
                     confirmedWagers={confirmedWagers}
                     zeroChipPlayers={zeroChipPlayers}
-                    isHost={isHost}
+                    isHost={isHost && !players.some(p => p.id === clientIdRef.current)}
                   />
                   </>
                 )}
@@ -918,8 +962,46 @@ export default function RoomPage() {
                     {/* Action Zone with Payout Result */}
                     <div className="rounded-xl bg-yellow-100 shadow-xl overflow-hidden">
                       <div className="p-6 space-y-3">
+                        {/* Next Button for Payout Phase - Players Only (not GM host) */}
+                        {(() => {
+                          const hostAsPlayer = isHost && players.some(p => p.id === clientIdRef.current);
+                          const isHostGM = isHost && !hostAsPlayer;
+                          
+                          // Only show next button for players (not host GM)
+                          if (!isHostGM) {
+                            return (
+                              <div className="mb-4">
+                                {readyForNextRound.includes(clientIdRef.current) ? (
+                                  <div className="text-center">
+                                    <p className="text-yellow-900 font-bold mb-2">✓ Ready for Next Round</p>
+                                    <p className="text-yellow-700 text-sm">
+                                      Waiting for others... ({readyForNextRound.length}/{players.length})
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={markReadyForNextRound}
+                                    className="w-full rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-4 text-lg shadow-md transition"
+                                  >
+                                    Next Question
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                        
                         {/* My Payout Result */}
-                        {!isHost && (() => {
+                        {(() => {
+                          const hostAsPlayer = isHost && players.some(p => p.id === clientIdRef.current);
+                          const isGMHost = isHost && !hostAsPlayer;
+                          
+                          // Show payout for players (including host in player mode), but not GM host
+                          if (isGMHost) return null;
+                          
+                          return (() => {
                         const myPayout = payoutResult.payouts[clientIdRef.current];
                         const myChips = payoutResult.chips[clientIdRef.current] || 0;
                         
@@ -970,15 +1052,27 @@ export default function RoomPage() {
                             </div>
                           );
                         }
+                        })();
                         })()}
                         
-                        {/* Host message */}
-                        {isHost && (
-                          <div className="text-center py-3">
-                            <p className="text-yellow-900 text-base font-bold mb-1">Host View</p>
-                            <p className="text-yellow-700 text-sm">Waiting for next round...</p>
-                          </div>
-                        )}
+                        {/* Host GM message */}
+                        {(() => {
+                          const hostAsPlayer = isHost && players.some(p => p.id === clientIdRef.current);
+                          const isHostGM = isHost && !hostAsPlayer;
+                          
+                          if (isHostGM) {
+                            return (
+                              <div className="text-center py-3">
+                                <p className="text-yellow-900 text-base font-bold mb-1">Host View (GM Mode)</p>
+                                <p className="text-yellow-700 text-sm mb-2">Use Host Controls to proceed to next round</p>
+                                <p className="text-yellow-900 font-bold text-sm">
+                                  {readyForNextRound.length}/{players.length} Players Ready
+                                </p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
                   </>

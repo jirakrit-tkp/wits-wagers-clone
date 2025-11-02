@@ -16,6 +16,9 @@ const LobbyPage = () => {
 
   const [isHost, setIsHost] = useState(false);
   const [hostId, setHostId] = useState(null);
+  const [hostMode, setHostMode] = useState("gm"); // "gm" or "player"
+  const [hostName, setHostName] = useState("");
+  const [hostColor, setHostColor] = useState("#DC2626");
   const [playerId, setPlayerId] = useState(null);
   const [nickname, setNickname] = useState("");
   const [color, setColor] = useState("#DC2626");
@@ -27,6 +30,8 @@ const LobbyPage = () => {
   const [selectedCategories, setSelectedCategories] = useState(availableCategories);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
+  const dropdownButtonRef = useRef(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, right: 0 });
   
   // Modal states
   const [showNameAlert, setShowNameAlert] = useState(false);
@@ -95,6 +100,7 @@ const LobbyPage = () => {
     // Check sessionStorage for existing session FIRST
     const savedIsHost = sessionStorage.getItem(`room_${id}_isHost`) === "true";
     const savedHostId = sessionStorage.getItem(`room_${id}_hostId`);
+    const savedHostMode = sessionStorage.getItem(`room_${id}_hostMode`) || "gm";
     const savedPlayerId = sessionStorage.getItem(`room_${id}_playerId`);
     const savedNickname = sessionStorage.getItem(`room_${id}_nickname`);
     const savedColor = sessionStorage.getItem(`room_${id}_color`);
@@ -103,9 +109,19 @@ const LobbyPage = () => {
     // If socket already initialized, just rejoin the new room
     if (socketRef.current && socketRef.current.connected) {
       if (savedIsHost && savedHostId) {
-        console.log(`[Lobby] Socket already connected - emitting createRoom: ${id}, hostId: ${savedHostId}`);
-        socketRef.current.emit("createRoom", { roomId: id, hostId: savedHostId });
-        socketRef.current.emit("joinRoom", { roomId: id, isHost: true, hostId: savedHostId });
+        const savedHostMode = sessionStorage.getItem(`room_${id}_hostMode`) || "gm";
+        const savedHostName = sessionStorage.getItem(`room_${id}_hostName`);
+        const savedHostColor = sessionStorage.getItem(`room_${id}_hostColor`);
+        console.log(`[Lobby] Socket already connected - emitting createRoom: ${id}, hostId: ${savedHostId}, hostMode: ${savedHostMode}, hostName: ${savedHostName}`);
+        socketRef.current.emit("createRoom", { roomId: id, hostId: savedHostId, hostMode: savedHostMode });
+        socketRef.current.emit("joinRoom", { 
+          roomId: id, 
+          isHost: true, 
+          hostId: savedHostId, 
+          hostMode: savedHostMode,
+          hostName: savedHostName,
+          hostColor: savedHostColor
+        });
         hasJoinedRoomRef.current = true;
         setIsRejoining(false);
       } else if (savedPlayerId && savedNickname && savedJoined) {
@@ -134,12 +150,14 @@ const LobbyPage = () => {
         clientIdRef.current = savedHostId;
         setIsHost(true);
         setHostId(savedHostId);
+        setHostMode(savedHostMode);
         setJoined(true);
         setIsRejoining(true);
         
         sessionStorage.setItem(`room_${id}`, JSON.stringify({
           isHost: true,
           hostId: savedHostId,
+          hostMode: savedHostMode,
           roomId: id
         }));
       } else if (savedPlayerId && savedNickname && savedJoined) {
@@ -190,11 +208,28 @@ const LobbyPage = () => {
         
         // Auto-create/join for host
         if (savedIsHost && savedHostId) {
-          console.log(`[Lobby] Host rejoining - emitting createRoom: ${id}, hostId: ${savedHostId}`);
-          s.emit("createRoom", { roomId: id, hostId: savedHostId });
-          s.emit("joinRoom", { roomId: id, isHost: true, hostId: savedHostId });
-          hasJoinedRoomRef.current = true;
-          setIsRejoining(false);
+          const savedHostMode = sessionStorage.getItem(`room_${id}_hostMode`) || "gm";
+          const savedHostName = sessionStorage.getItem(`room_${id}_hostName`);
+          const savedHostColor = sessionStorage.getItem(`room_${id}_hostColor`);
+          console.log(`[Lobby] Host rejoining - emitting createRoom: ${id}, hostId: ${savedHostId}, hostMode: ${savedHostMode}, hostName: ${savedHostName}`);
+          s.emit("createRoom", { roomId: id, hostId: savedHostId, hostMode: savedHostMode });
+          
+          // For GM mode, always join. For player mode, only join if name/color exists
+          if (savedHostMode === "gm" || (savedHostMode === "player" && savedHostName && savedHostColor)) {
+            s.emit("joinRoom", { 
+              roomId: id, 
+              isHost: true, 
+              hostId: savedHostId, 
+              hostMode: savedHostMode,
+              hostName: savedHostName,
+              hostColor: savedHostColor
+            });
+            hasJoinedRoomRef.current = true;
+            setIsRejoining(false);
+          } else {
+            // Player mode without name/color - don't mark as joined yet
+            hasJoinedRoomRef.current = false;
+          }
         }
         // Auto-rejoin for player
         else if (savedPlayerId && savedNickname && savedJoined) {
@@ -292,30 +327,65 @@ const LobbyPage = () => {
     console.log(`[Lobby] Router query:`, router.query);
     const urlIsHost = router.query.host === "true";
     const urlHostId = router.query.hostId || router.query.hostid; // Support both cases
-    console.log(`[Lobby] URL check - isHost: ${urlIsHost}, hostId: ${urlHostId}, socketReady: ${socketReady}`);
+    const urlHostMode = router.query.hostMode || "gm";
+    const urlHostName = router.query.hostName;
+    const urlHostColor = router.query.hostColor;
+    console.log(`[Lobby] URL check - isHost: ${urlIsHost}, hostId: ${urlHostId}, hostMode: ${urlHostMode}, hostName: ${urlHostName}, hostColor: ${urlHostColor}, socketReady: ${socketReady}`);
 
     if (urlIsHost && urlHostId && !joined) {
       clientIdRef.current = urlHostId;
       setIsHost(true);
       setHostId(urlHostId);
-      setJoined(true);
-      setIsRejoining(false);
+      setHostMode(urlHostMode);
+      
+      // For GM mode, join immediately. For player mode, wait for name/color input
+      if (urlHostMode === "gm") {
+        setJoined(true);
+        setIsRejoining(false);
+      } else {
+        // Player mode - check if name/color already set
+        const savedHostName = sessionStorage.getItem(`room_${id}_hostName`);
+        const savedHostColor = sessionStorage.getItem(`room_${id}_hostColor`);
+        if (savedHostName && savedHostColor) {
+          setHostName(savedHostName);
+          setHostColor(savedHostColor);
+          setJoined(true);
+          setIsRejoining(false);
+        } else {
+          // Show join form
+          setJoined(false);
+        }
+      }
 
       sessionStorage.setItem(`room_${id}_isHost`, "true");
       sessionStorage.setItem(`room_${id}_hostId`, urlHostId);
-      sessionStorage.setItem(`room_${id}_joined`, "true");
+      sessionStorage.setItem(`room_${id}_hostMode`, urlHostMode);
       
       sessionStorage.setItem(`room_${id}`, JSON.stringify({
         isHost: true,
         hostId: urlHostId,
+        hostMode: urlHostMode,
+        hostName: urlHostName,
+        hostColor: urlHostColor,
         roomId: id
       }));
 
       const emitCreateRoom = () => {
         if (!socketRef.current) return;
-        console.log(`[Lobby] Host emitting createRoom: ${id}, hostId: ${urlHostId}`);
-        socketRef.current.emit("createRoom", { roomId: id, hostId: urlHostId });
-        socketRef.current.emit("joinRoom", { roomId: id, isHost: true, hostId: urlHostId });
+        console.log(`[Lobby] Host emitting createRoom: ${id}, hostId: ${urlHostId}, hostMode: ${urlHostMode}`);
+        socketRef.current.emit("createRoom", { roomId: id, hostId: urlHostId, hostMode: urlHostMode });
+        
+        // Only join immediately if GM mode or player mode with saved name/color
+        if (urlHostMode === "gm" || (urlHostMode === "player" && urlHostName && urlHostColor)) {
+          socketRef.current.emit("joinRoom", { 
+            roomId: id, 
+            isHost: true, 
+            hostId: urlHostId, 
+            hostMode: urlHostMode,
+            hostName: urlHostName,
+            hostColor: urlHostColor
+          });
+        }
       };
 
       if (socketRef.current) {
@@ -349,7 +419,7 @@ const LobbyPage = () => {
         console.log(`[Lobby] ⚠️ Socket is null, cannot create room`);
       }
     }
-  }, [router.isReady, router.query.host, router.query.hostId, router.query.hostid, id, joined, socketReady]);
+  }, [router.isReady, router.query.host, router.query.hostId, router.query.hostid, router.query.hostMode, router.query.hostName, router.query.hostColor, id, joined, socketReady]);
 
   // Join Room function for players
   const joinRoom = () => {
@@ -456,6 +526,134 @@ const LobbyPage = () => {
     if (!socketRef.current || !playerId) return;
     socketRef.current.emit("leaveRoom", { roomId: id, playerId: playerId });
   };
+
+  // Join host as player function
+  const joinHostAsPlayer = () => {
+    if (!hostName.trim()) {
+      setShowNameAlert(true);
+      return;
+    }
+
+    const socket = socketRef.current;
+    if (!socket) return;
+
+    // Ensure room is created first
+    const emitJoin = () => {
+      // Create room first if not exists
+      socket.emit("createRoom", { roomId: id, hostId: hostId, hostMode: hostMode });
+      
+      // Then join as player
+      socket.emit("joinRoom", { 
+        roomId: id, 
+        isHost: true, 
+        hostId: hostId, 
+        hostMode: hostMode,
+        hostName: hostName.trim(),
+        hostColor: hostColor
+      });
+      
+      setJoined(true);
+      setIsRejoining(false);
+      hasJoinedRoomRef.current = true;
+      sessionStorage.setItem(`room_${id}_hostName`, hostName.trim());
+      sessionStorage.setItem(`room_${id}_hostColor`, hostColor);
+      sessionStorage.setItem(`room_${id}_joined`, "true");
+    };
+
+    if (socket.connected) {
+      emitJoin();
+    } else {
+      socket.once("connect", emitJoin);
+    }
+  };
+
+  // Show join form for host player (not yet joined)
+  if (isHost && hostMode === "player" && !joined) {
+    return (
+      <>
+        <Snackbar
+          isOpen={showNameAlert}
+          onClose={() => setShowNameAlert(false)}
+          message="Please enter your name to join as player"
+          type="warning"
+          duration={3000}
+        />
+        
+        <div className="relative min-h-screen bg-yellow-200 flex items-center justify-center p-4 overflow-hidden">
+          {/* Radial gradient base */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 [background:radial-gradient(circle_at_50%_50%,#fde047_0%,#facc15_35%,#eab308_60%,#ca8a04_100%)] [mask-image:radial-gradient(circle_at_50%_50%,rgba(0,0,0,1)_0%,rgba(0,0,0,0.85)_35%,rgba(0,0,0,0.6)_60%,rgba(0,0,0,0.25)_100%)]"
+          />
+          
+          {/* Subtle sunburst stripes */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute left-1/2 top-1/2 w-[200vmax] h-[200vmax] -translate-x-1/2 -translate-y-1/2"
+          >
+            <div
+              className="sunburst-rotate w-full h-full [background:repeating-conic-gradient(from_0deg_at_50%_50%,rgba(255,255,255,0.15)_0deg,rgba(255,255,255,0.15)_12deg,rgba(255,255,255,0)_12deg,rgba(255,255,255,0)_28deg)]"
+            />
+          </div>
+
+          <article className="relative z-10 rounded-2xl bg-white shadow-2xl p-8 max-w-md w-full">
+            <h1 className="text-3xl font-bold text-black mb-2 text-center">Host - Join as Player</h1>
+            <p className="text-center text-black mb-6">Room Code: <span className="font-mono font-bold text-blue-700">{id}</span></p>
+            
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                joinHostAsPlayer();
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label htmlFor="host-name-input" className="block text-sm font-medium text-black mb-2">
+                  Your Name
+                </label>
+                <input
+                  id="host-name-input"
+                  type="text"
+                  value={hostName}
+                  onChange={(e) => setHostName(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 outline-none"
+                  placeholder="Enter your name"
+                  maxLength={20}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="host-color" className="block text-sm font-medium text-black mb-2">
+                  Choose Color
+                </label>
+                <div className="flex gap-2 flex-wrap">
+                  {["#DC2626", "#EA580C", "#CA8A04", "#16A34A", "#0284C7", "#7C3AED", "#DB2777"].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setHostColor(c)}
+                      className={`w-10 h-10 rounded-full border-2 ${
+                        hostColor === c ? "border-black scale-110" : "border-gray-300"
+                      } transition`}
+                      style={{ backgroundColor: c }}
+                      aria-label={`Select color ${c}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full rounded-lg bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 transition"
+              >
+                Join as Player
+              </button>
+            </form>
+          </article>
+        </div>
+      </>
+    );
+  }
 
   if (!joined && !isHost) {
     // Player Join Form
@@ -676,10 +874,21 @@ const LobbyPage = () => {
                     {isHost ? (
                       <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center" ref={dropdownRef}>
                       {/* Category Dropdown (Host Only) */}
-                      <div className="relative">
+                      <div className="relative z-50">
                         <button
+                          ref={dropdownButtonRef}
                           type="button"
-                          onClick={() => setDropdownOpen(!dropdownOpen)}
+                          onClick={() => {
+                            if (dropdownButtonRef.current) {
+                              const rect = dropdownButtonRef.current.getBoundingClientRect();
+                              setDropdownPosition({
+                                top: rect.bottom + 8,
+                                left: rect.left,
+                                right: window.innerWidth - rect.right
+                              });
+                            }
+                            setDropdownOpen(!dropdownOpen);
+                          }}
                           className="w-full sm:w-auto rounded-xl border-2 border-yellow-400 bg-white px-4 py-3 text-black font-bold hover:bg-yellow-50 transition shadow-lg flex items-center justify-center gap-2"
                           title="Select Categories"
                         >
@@ -692,9 +901,17 @@ const LobbyPage = () => {
                           </svg>
                         </button>
 
-                        {/* Dropdown Menu */}
+                        {/* Dropdown Menu - Use fixed positioning to escape overflow constraint */}
                         {dropdownOpen && (
-                          <div className="absolute left-0 sm:right-0 mt-2 w-full sm:w-56 bg-white rounded-lg border-2 border-yellow-400 shadow-xl z-50">
+                          <div 
+                            className="fixed bg-white rounded-lg border-2 border-yellow-400 shadow-xl z-[9999] max-h-[calc(100vh-200px)] overflow-y-auto"
+                            style={{
+                              top: `${dropdownPosition.top}px`,
+                              left: window.innerWidth >= 640 ? 'auto' : `${dropdownPosition.left}px`,
+                              right: window.innerWidth >= 640 ? `${dropdownPosition.right}px` : 'auto',
+                              width: window.innerWidth >= 640 ? '14rem' : 'calc(100vw - 2rem)',
+                            }}
+                          >
                             <div className="p-2">
                               {availableCategories.map(category => (
                                 <label
