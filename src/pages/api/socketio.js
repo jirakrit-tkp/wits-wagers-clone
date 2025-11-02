@@ -16,6 +16,7 @@ import {
   nextRound,
   setPhase,
   deleteRoom,
+  readyForNextRound,
 } from "@/lib/gameState";
 
 export default function handler(req, res) {
@@ -26,21 +27,24 @@ export default function handler(req, res) {
 
     io.on("connection", (socket) => {
       console.log(`✅ New socket connected: ${socket.id} [PID: ${process.pid}]`);
-      socket.on("createRoom", ({ roomId, hostId }) => {
+      socket.on("createRoom", ({ roomId, hostId, hostMode = "gm" }) => {
         // Check if room already exists (e.g., when host refreshes)
         let room = getRoom(roomId);
         
         if (!room) {
           // Room doesn't exist, create it
-          createRoom(roomId, hostId);
+          createRoom(roomId, hostId, hostMode);
           room = getRoom(roomId);
-          console.log(`Room ${roomId} created by host ${hostId}`);
+          console.log(`Room ${roomId} created by host ${hostId} (mode: ${hostMode})`);
         } else {
-          // Room exists, just update hostId if needed
+          // Room exists, just update hostId and hostMode if needed
           if (!room.hostId || room.hostId !== hostId) {
             room.hostId = hostId;
           }
-          console.log(`Room ${roomId} already exists, host ${hostId} rejoining`);
+          if (hostMode && room.hostMode !== hostMode) {
+            room.hostMode = hostMode;
+          }
+          console.log(`Room ${roomId} already exists, host ${hostId} rejoining (mode: ${room.hostMode})`);
         }
         
         socket.join(roomId);
@@ -48,7 +52,7 @@ export default function handler(req, res) {
         io.to(roomId).emit("roomUpdate", room);
       });
 
-      socket.on("joinRoom", ({ roomId, player, isHost, hostId }) => {
+      socket.on("joinRoom", ({ roomId, player, isHost, hostId, hostMode = "gm", hostName, hostColor }) => {
         const room = getRoom(roomId);
         if (!room) {
           socket.emit("error", { message: "Room not found" });
@@ -58,8 +62,31 @@ export default function handler(req, res) {
         // Check if socket already in this room to prevent duplicate joins
         const rooms = Array.from(socket.rooms);
         if (rooms.includes(roomId)) {
-          console.log(`Socket ${socket.id} already in room ${roomId}, ignoring duplicate join`);
-          // Don't send any events to prevent triggering more loops
+          console.log(`Socket ${socket.id} already in room ${roomId}`);
+          
+          // Even if already in room, if host is joining as player and not in players list, add them
+          if (isHost && hostMode === "player" && hostId) {
+            const existingPlayer = room.players.find(p => p.id === hostId);
+            if (!existingPlayer) {
+              // Host player not in list yet - add them
+              const hostPlayer = {
+                id: hostId,
+                name: hostName || "Host",
+                color: hostColor || "#000000",
+                score: 0,
+                isHost: true,
+              };
+              addPlayer(roomId, hostPlayer);
+              console.log(`Host ${hostId} added as player (was already in room but not in players list)`);
+              
+              const updatedRoom = getRoom(roomId);
+              io.to(roomId).emit("playersUpdate", updatedRoom.players);
+              io.to(roomId).emit("chipsUpdate", updatedRoom.chips);
+              io.to(roomId).emit("roomUpdate", updatedRoom);
+            }
+          }
+          
+          // Still return to prevent duplicate processing
           return;
         }
 
@@ -67,20 +94,65 @@ export default function handler(req, res) {
         socket.join(roomId);
         console.log(`Socket ${socket.id} joined room ${roomId}`);
 
-        // Host joins but is NOT added to players list
+        // Host joins
         if (isHost) {
           if (!room.hostId && hostId) {
             room.hostId = hostId;
           }
-          console.log(`Host ${hostId} joined room ${roomId}`);
+          if (hostMode && room.hostMode !== hostMode) {
+            room.hostMode = hostMode;
+          }
+          
+          // If host mode is "player", add host as a player
+          if (room.hostMode === "player" && hostId) {
+            // Check if host already exists as player
+            const existingPlayerIndex = room.players.findIndex(p => p.id === hostId);
+            
+            if (existingPlayerIndex >= 0) {
+              // Host already a player, update info (name and color)
+              if (hostName) {
+                room.players[existingPlayerIndex].name = hostName;
+              }
+              if (hostColor) {
+                room.players[existingPlayerIndex].color = hostColor;
+              }
+              console.log(`Host ${hostId} rejoining as player (name: ${hostName || room.players[existingPlayerIndex].name})`);
+              
+              // Broadcast players update to everyone
+              const updatedRoom = getRoom(roomId);
+              io.to(roomId).emit("playersUpdate", updatedRoom.players);
+              io.to(roomId).emit("chipsUpdate", updatedRoom.chips);
+            } else {
+              // Add host as player
+              const hostPlayer = {
+                id: hostId,
+                name: hostName || "Host",
+                color: hostColor || "#000000",
+                score: 0,
+                isHost: true,
+              };
+              addPlayer(roomId, hostPlayer);
+              console.log(`Host ${hostId} added as player (mode: ${room.hostMode}, name: ${hostPlayer.name}, color: ${hostPlayer.color})`);
+              
+              // Broadcast players update to everyone including host
+              const updatedRoom = getRoom(roomId);
+              io.to(roomId).emit("playersUpdate", updatedRoom.players);
+              io.to(roomId).emit("chipsUpdate", updatedRoom.chips);
+            }
+          } else {
+            console.log(`Host ${hostId} joined as GM (mode: ${room.hostMode})`);
+          }
           
           // Send room update to everyone in the room
           io.to(roomId).emit("roomUpdate", room);
           
+          // Broadcast players list to everyone (including host if in player mode)
+          const finalRoom = getRoom(roomId);
+          io.to(roomId).emit("playersUpdate", finalRoom.players);
+          
           // Send current players list to the host
-          socket.emit("playersUpdate", room.players);
-          socket.emit("chipsUpdate", room.chips); // Send chips to host too
-          socket.emit("categoriesUpdate", { categories: room.selectedCategories || [] }); // Send categories
+          socket.emit("chipsUpdate", finalRoom.chips); // Send chips to host too
+          socket.emit("categoriesUpdate", { categories: finalRoom.selectedCategories || [] }); // Send categories
           return;
         }
 
@@ -348,12 +420,82 @@ export default function handler(req, res) {
           return;
         }
         
-        const result = setPhase(roomId, phase);
-        if (result) {
+        // Special handling: when forcing from question → wager, need to reveal answers first
+        if (room.phase === "question" && phase === "wager") {
+          console.log(`[Server] Force next phase: question → wager, revealing answers first...`);
+          const result = revealAnswersAndPrepareWagers(roomId);
+          if (result) {
+            const finalRoom = getRoom(roomId);
+            console.log(`✅ Transition complete. Phase: ${finalRoom.phase}, Tiles: ${result.answerTiles.length}`);
+            console.log(`🎁 Zero-chip players:`, result.zeroChipPlayers);
+            io.to(roomId).emit("answersRevealed", result);
+            io.to(roomId).emit("roomUpdate", finalRoom);
+            io.to(roomId).emit("chipsUpdate", finalRoom.chips);
+          }
+        } else if (room.phase === "wager" && phase === "payout") {
+          // Special handling: when forcing from wager → payout, need to calculate payouts first
+          console.log(`[Server] Force next phase: wager → payout, calculating payouts first...`);
+          if (!room.currentQuestion) {
+            console.error(`No current question in room ${roomId} for payout calculation`);
+            return;
+          }
+          const payoutResult = revealCorrectAnswerAndPayout(roomId, room.currentQuestion.answer);
+          if (payoutResult) {
+            const finalRoom = getRoom(roomId);
+            console.log(`✅ Payouts calculated. Emitting results to room ${roomId}`);
+            io.to(roomId).emit("payoutResult", payoutResult);
+            io.to(roomId).emit("roomUpdate", finalRoom);
+            io.to(roomId).emit("chipsUpdate", finalRoom.chips);
+          }
+        } else {
+          // Normal phase change
+          const result = setPhase(roomId, phase);
+          if (result) {
+            const updatedRoom = getRoom(roomId);
+            console.log(`Phase changed in room ${roomId} to ${phase}`);
+            io.to(roomId).emit("phaseChanged", result);
+            io.to(roomId).emit("roomUpdate", updatedRoom);
+          }
+        }
+      });
+
+      socket.on("readyForNextRound", ({ roomId, playerId }) => {
+        const room = getRoom(roomId);
+        if (!room) {
+          console.error(`Room ${roomId} not found for readyForNextRound`);
+          socket.emit("error", { message: "Room not found" });
+          return;
+        }
+        
+        const result = readyForNextRound(roomId, playerId);
+        
+        if (result.success) {
+          console.log(`✅ Player ${playerId} ready for next round in room ${roomId} (${result.readyCount}/${result.totalPlayers})`);
+          
           const updatedRoom = getRoom(roomId);
-          console.log(`Phase changed in room ${roomId} to ${phase}`);
-          io.to(roomId).emit("phaseChanged", result);
-          io.to(roomId).emit("roomUpdate", updatedRoom);
+          io.to(roomId).emit("readyForNextRoundUpdate", { 
+            readyCount: result.readyCount,
+            totalPlayers: result.totalPlayers,
+            readyPlayers: updatedRoom.readyForNextRound
+          });
+          
+          // Auto-advance to next round if all players ready
+          if (result.allReady) {
+            console.log(`🎯 All players ready for next round! Auto-advancing to next round for room ${roomId}`);
+            
+            const nextRoundResult = nextRound(roomId);
+            if (nextRoundResult) {
+              const finalRoom = getRoom(roomId);
+              io.to(roomId).emit("nextRound", nextRoundResult);
+              io.to(roomId).emit("roomUpdate", finalRoom);
+              io.to(roomId).emit("playersUpdate", finalRoom.players);
+              io.to(roomId).emit("answersUpdate", finalRoom.answers);
+              io.to(roomId).emit("chipsUpdate", finalRoom.chips);
+            }
+          }
+        } else {
+          console.log(`❌ Ready for next round failed for ${playerId}: ${result.error}`);
+          socket.emit("readyForNextRoundError", { error: result.error });
         }
       });
 

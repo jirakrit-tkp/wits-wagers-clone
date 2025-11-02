@@ -8,6 +8,7 @@ export default function HomePage() {
   const [createdRoomId, setCreatedRoomId] = useState("");
   const [joinRoomId, setJoinRoomId] = useState("");
   const [hostId, setHostId] = useState("");
+  const [hostMode, setHostMode] = useState("gm"); // "gm" or "player"
   const [snackbar, setSnackbar] = useState({ isOpen: false, message: "", type: "info" });
 
   const createRoom = () => {
@@ -20,7 +21,12 @@ export default function HomePage() {
 
   const goToCreatedRoom = () => {
     if (!createdRoomId) return;
-    router.push(`/room/${createdRoomId}/lobby?host=true&hostId=${hostId}`);
+    const params = new URLSearchParams({
+      host: "true",
+      hostId: hostId,
+      hostMode: hostMode,
+    });
+    router.push(`/room/${createdRoomId}/lobby?${params.toString()}`);
   };
 
   const showSnackbar = (message, type = "info") => {
@@ -69,7 +75,7 @@ export default function HomePage() {
           <div className="mt-6 w-full md:max-w-3xl mx-auto flex justify-center">
             <div className="flex flex-col md:flex-row gap-4 max-sm:w-full">
               {/* Host / Create Room */}
-              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl p-4 flex flex-col items-center text-cente">
+              <article className="rounded-2xl bg-white/90 backdrop-blur shadow-xl p-4 flex flex-col items-center text-center">
                 <h2 className="text-lg font-bold text-blue-900">Host</h2>
                 {!createdRoomId && (
                   <button
@@ -81,18 +87,35 @@ export default function HomePage() {
                   </button>
                 )}
                 {createdRoomId && (
-                  <div className="mt-3 w-full">
+                  <div className="mt-3 w-full space-y-3">
                     <a
-                      className="block break-words font-mono text-blue-800 underline"
+                      className="block break-words font-mono text-blue-800 underline text-sm"
                       href={`/room/${createdRoomId}`}
                     >{`/room/${createdRoomId}`}</a>
+                    
+                    {/* Play as selection - left side, Enter button - right side */}
+                    <div className="flex flex-col sm:flex-row gap-3 items-stretch">
+                      {/* Play as dropdown - left */}
+                      <div className="flex-1 relative">
+                      <select
+                        value={hostMode}
+                        onChange={(e) => setHostMode(e.target.value)}
+                        className="w-full rounded-full border-2 border-blue-300 px-4 py-2.5 text-blue-900 font-semibold bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="gm">GM</option>
+                        <option value="player">Player</option>
+                      </select>
+                    </div>
+                    
+                    {/* Enter button - right */}
                     <button
                       type="button"
                       onClick={goToCreatedRoom}
-                      className="mt-3 w-full inline-flex items-center justify-center rounded-full bg-green-600 hover:bg-green-700 text-white font-semibold px-5 py-2.5 shadow-md transition whitespace-nowrap"
+                      className="w-full sm:w-auto sm:flex-shrink-0 rounded-full bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-2.5 shadow-md transition whitespace-nowrap self-end sm:self-auto"
                     >
                       Enter
                     </button>
+                  </div>
                   </div>
                 )}
               </article>
